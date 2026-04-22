@@ -1,0 +1,158 @@
+--// SERVICES
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+--// GUI
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "LzinnHub"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.DisplayOrder = 999
+gui.Parent = playerGui
+
+--// VARS
+getgenv().SpeedEnabled = false
+getgenv().SpeedValue = 16
+
+--// BOTÃO MENU
+local open = Instance.new("TextButton")
+open.Parent = gui
+open.Size = UDim2.new(0,30,0,30)
+open.Position = UDim2.new(1,-45,0,70)
+open.Text = "≡"
+open.TextScaled = true
+open.BackgroundColor3 = Color3.fromRGB(30,30,30)
+open.TextColor3 = Color3.new(1,1,1)
+
+--// MENU
+local main = Instance.new("Frame")
+main.Parent = gui
+main.Size = UDim2.new(0,260,0,220)
+main.Position = UDim2.new(0.5,-130,0.5,-110)
+main.BackgroundColor3 = Color3.fromRGB(20,20,20)
+main.Visible = false
+
+open.MouseButton1Click:Connect(function()
+    main.Visible = not main.Visible
+end)
+
+--// LAYOUT
+local layout = Instance.new("UIListLayout", main)
+layout.Padding = UDim.new(0,6)
+
+local padding = Instance.new("UIPadding", main)
+padding.PaddingLeft = UDim.new(0,6)
+padding.PaddingRight = UDim.new(0,6)
+padding.PaddingTop = UDim.new(0,6)
+
+--// TITLE
+local title = Instance.new("TextLabel")
+title.Parent = main
+title.Size = UDim2.new(1,0,0,30)
+title.Text = "Player Menu"
+title.TextScaled = true
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.new(1,1,1)
+
+--// TOGGLE SPEED
+local toggle = Instance.new("TextButton")
+toggle.Parent = main
+toggle.Size = UDim2.new(1,0,0,35)
+toggle.Text = "Speed: OFF"
+toggle.TextScaled = true
+toggle.BackgroundColor3 = Color3.fromRGB(40,40,40)
+toggle.TextColor3 = Color3.new(1,1,1)
+
+toggle.MouseButton1Click:Connect(function()
+    getgenv().SpeedEnabled = not getgenv().SpeedEnabled
+    toggle.Text = "Speed: "..(getgenv().SpeedEnabled and "ON" or "OFF")
+end)
+
+--// "SLIDER"
+local slider = Instance.new("TextButton")
+slider.Parent = main
+slider.Size = UDim2.new(1,0,0,35)
+slider.Text = "Speed: 16"
+slider.TextScaled = true
+slider.BackgroundColor3 = Color3.fromRGB(40,40,40)
+slider.TextColor3 = Color3.new(1,1,1)
+
+slider.MouseButton1Click:Connect(function()
+    getgenv().SpeedValue = getgenv().SpeedValue + 4
+    if getgenv().SpeedValue > 60 then
+        getgenv().SpeedValue = 16
+    end
+    slider.Text = "Speed: "..getgenv().SpeedValue
+end)
+
+--// SPEED (ANTI-RESET + FALLBACK)
+task.spawn(function()
+    while true do
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+
+        if getgenv().SpeedEnabled then
+            if hum then
+                hum.WalkSpeed = getgenv().SpeedValue
+            end
+
+            -- fallback caso o jogo ignore WalkSpeed
+            if root then
+                root.Velocity = root.CFrame.LookVector * getgenv().SpeedValue
+            end
+        else
+            if hum then
+                hum.WalkSpeed = 16
+            end
+        end
+
+        task.wait()
+    end
+end)
+
+--// RESPAWN FIX
+LocalPlayer.CharacterAdded:Connect(function(char)
+    local hum = char:WaitForChild("Humanoid")
+
+    task.wait(0.5)
+
+    if getgenv().SpeedEnabled then
+        hum.WalkSpeed = getgenv().SpeedValue
+    end
+end)
+
+--// DETECTAR ROLL
+local function hookRoll()
+    local guiPlayer = LocalPlayer:WaitForChild("PlayerGui")
+    local roll = guiPlayer:FindFirstChild("ROLL", true)
+
+    if roll and not roll:FindFirstChild("Hook") then
+        Instance.new("BoolValue", roll).Name = "Hook"
+
+        roll.MouseButton1Down:Connect(function()
+            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+
+            if hum then
+                local original = getgenv().SpeedEnabled and getgenv().SpeedValue or 16
+
+                -- reduz
+                hum.WalkSpeed = 6
+
+                task.wait(1)
+
+                -- volta
+                hum.WalkSpeed = original
+            end
+        end)
+    end
+end
+
+task.spawn(function()
+    while true do
+        hookRoll()
+        task.wait(1)
+    end
+end)
