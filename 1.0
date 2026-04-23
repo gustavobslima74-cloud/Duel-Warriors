@@ -1,158 +1,397 @@
 --// SERVICES
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
---// GUI
-local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+--// VARS GLOBAIS
+getgenv().AutoAttack = false
+getgenv().StickMode = false
+getgenv().TeleportOnAttack = false
+getgenv().FloatingPanelVisible = true
 
-local gui = Instance.new("ScreenGui")
-gui.Name = "LzinnHub"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
-gui.DisplayOrder = 999
-gui.Parent = playerGui
+-- Ajustes de Grudar
+getgenv().StickDistance = 3
+getgenv().StickSmoothness = 0 -- 0 é instantâneo
 
---// VARS
-getgenv().SpeedEnabled = false
-getgenv().SpeedValue = 16
+-- LocalPlayer Vars
+getgenv().WalkSpeedValue = 16
+getgenv().InfiniteJump = false
+getgenv().AntiFling = false
 
---// BOTÃO MENU
-local open = Instance.new("TextButton")
-open.Parent = gui
-open.Size = UDim2.new(0,30,0,30)
-open.Position = UDim2.new(1,-45,0,70)
-open.Text = "≡"
-open.TextScaled = true
-open.BackgroundColor3 = Color3.fromRGB(30,30,30)
-open.TextColor3 = Color3.new(1,1,1)
+local whitelist = {}
+local attackRange = 15
 
---// MENU
-local main = Instance.new("Frame")
-main.Parent = gui
-main.Size = UDim2.new(0,260,0,220)
-main.Position = UDim2.new(0.5,-130,0.5,-110)
-main.BackgroundColor3 = Color3.fromRGB(20,20,20)
-main.Visible = false
-
-open.MouseButton1Click:Connect(function()
-    main.Visible = not main.Visible
-end)
-
---// LAYOUT
-local layout = Instance.new("UIListLayout", main)
-layout.Padding = UDim.new(0,6)
-
-local padding = Instance.new("UIPadding", main)
-padding.PaddingLeft = UDim.new(0,6)
-padding.PaddingRight = UDim.new(0,6)
-padding.PaddingTop = UDim.new(0,6)
-
---// TITLE
-local title = Instance.new("TextLabel")
-title.Parent = main
-title.Size = UDim2.new(1,0,0,30)
-title.Text = "Player Menu"
-title.TextScaled = true
-title.BackgroundTransparency = 1
-title.TextColor3 = Color3.new(1,1,1)
-
---// TOGGLE SPEED
-local toggle = Instance.new("TextButton")
-toggle.Parent = main
-toggle.Size = UDim2.new(1,0,0,35)
-toggle.Text = "Speed: OFF"
-toggle.TextScaled = true
-toggle.BackgroundColor3 = Color3.fromRGB(40,40,40)
-toggle.TextColor3 = Color3.new(1,1,1)
-
-toggle.MouseButton1Click:Connect(function()
-    getgenv().SpeedEnabled = not getgenv().SpeedEnabled
-    toggle.Text = "Speed: "..(getgenv().SpeedEnabled and "ON" or "OFF")
-end)
-
---// "SLIDER"
-local slider = Instance.new("TextButton")
-slider.Parent = main
-slider.Size = UDim2.new(1,0,0,35)
-slider.Text = "Speed: 16"
-slider.TextScaled = true
-slider.BackgroundColor3 = Color3.fromRGB(40,40,40)
-slider.TextColor3 = Color3.new(1,1,1)
-
-slider.MouseButton1Click:Connect(function()
-    getgenv().SpeedValue = getgenv().SpeedValue + 4
-    if getgenv().SpeedValue > 60 then
-        getgenv().SpeedValue = 16
-    end
-    slider.Text = "Speed: "..getgenv().SpeedValue
-end)
-
---// SPEED (ANTI-RESET + FALLBACK)
-task.spawn(function()
-    while true do
-        local char = LocalPlayer.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-
-        if getgenv().SpeedEnabled then
-            if hum then
-                hum.WalkSpeed = getgenv().SpeedValue
-            end
-
-            -- fallback caso o jogo ignore WalkSpeed
-            if root then
-                root.Velocity = root.CFrame.LookVector * getgenv().SpeedValue
-            end
-        else
-            if hum then
-                hum.WalkSpeed = 16
-            end
-        end
-
-        task.wait()
-    end
-end)
-
---// RESPAWN FIX
-LocalPlayer.CharacterAdded:Connect(function(char)
-    local hum = char:WaitForChild("Humanoid")
-
-    task.wait(0.5)
-
-    if getgenv().SpeedEnabled then
-        hum.WalkSpeed = getgenv().SpeedValue
-    end
-end)
-
---// DETECTAR ROLL
-local function hookRoll()
-    local guiPlayer = LocalPlayer:WaitForChild("PlayerGui")
-    local roll = guiPlayer:FindFirstChild("ROLL", true)
-
-    if roll and not roll:FindFirstChild("Hook") then
-        Instance.new("BoolValue", roll).Name = "Hook"
-
-        roll.MouseButton1Down:Connect(function()
-            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
-
-            if hum then
-                local original = getgenv().SpeedEnabled and getgenv().SpeedValue or 16
-
-                -- reduz
-                hum.WalkSpeed = 6
-
-                task.wait(1)
-
-                -- volta
-                hum.WalkSpeed = original
-            end
-        end)
-    end
+--// REMOVE VERSÃO ANTIGA
+if CoreGui:FindFirstChild("DuelWarriorsUI") then
+    CoreGui.DuelWarriorsUI:Destroy()
 end
 
+--// FUNÇÕES CORE
+local function getRemote()
+    local charFolder = workspace:FindFirstChild("Player")
+    if not charFolder then return end
+    local plrFolder = charFolder:FindFirstChild(LocalPlayer.Name)
+    if not plrFolder then return end
+    return plrFolder:FindFirstChild("Communicate")
+end
+
+local function isWhitelisted(plr)
+    return whitelist[plr.UserId] == true
+end
+
+local function getClosest()
+    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return nil, math.huge end
+
+    local closest = nil
+    local dist = math.huge
+
+    for _,plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and not isWhitelisted(plr) and plr.Character then
+            local root = plr.Character:FindFirstChild("HumanoidRootPart")
+            local hum = plr.Character:FindFirstChild("Humanoid")
+
+            if root and hum and hum.Health > 0 then
+                local d = (myRoot.Position - root.Position).Magnitude
+                if d < dist then
+                    dist = d
+                    closest = plr
+                end
+            end
+        end
+    end
+    return closest, dist
+end
+
+--// GUI SETUP
+local gui = Instance.new("ScreenGui")
+gui.Name = "DuelWarriorsUI"
+gui.ResetOnSpawn = false
+gui.Parent = CoreGui
+
+local function makeDraggable(guiObject)
+    local dragging, dragInput, dragStart, startPos
+    guiObject.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = guiObject.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    guiObject.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+    end)
+    RunService.RenderStepped:Connect(function()
+        if dragging and dragInput then
+            local delta = dragInput.Position - dragStart
+            guiObject.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+--// MENU PRINCIPAL
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0, 260, 0, 420)
+main.Position = UDim2.new(0.5, -130, 0.5, -210)
+main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+main.Visible = false
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
+makeDraggable(main)
+
+local mainStroke = Instance.new("UIStroke", main)
+mainStroke.Thickness = 3
+
+-- Botão abrir
+local openBtn = Instance.new("TextButton", gui)
+openBtn.Size = UDim2.new(0, 45, 0, 45)
+openBtn.Position = UDim2.new(1, -60, 0, 20)
+openBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+openBtn.Text = "DW"
+openBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+openBtn.TextScaled = true
+Instance.new("UICorner", openBtn).CornerRadius = UDim.new(1, 0)
+makeDraggable(openBtn)
+openBtn.MouseButton1Click:Connect(function() main.Visible = not main.Visible end)
+
+-- Título RGB
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1, 0, 0, 35)
+title.BackgroundTransparency = 1
+title.Text = "Duel Warriors Script 1.0"
+title.Font = Enum.Font.GothamBlack
+title.TextScaled = true
+
+--// SISTEMA DE ABAS
+local tabHolder = Instance.new("Frame", main)
+tabHolder.Size = UDim2.new(1, -20, 0, 35)
+tabHolder.Position = UDim2.new(0, 10, 0, 40)
+tabHolder.BackgroundTransparency = 1
+
+local combatTab = Instance.new("ScrollingFrame", main)
+combatTab.Size = UDim2.new(1, -20, 1, -90)
+combatTab.Position = UDim2.new(0, 10, 0, 80)
+combatTab.BackgroundTransparency = 1
+combatTab.ScrollBarThickness = 0
+combatTab.Visible = true
+
+local playerTab = Instance.new("ScrollingFrame", main)
+playerTab.Size = UDim2.new(1, -20, 1, -90)
+playerTab.Position = UDim2.new(0, 10, 0, 80)
+playerTab.BackgroundTransparency = 1
+playerTab.ScrollBarThickness = 0
+playerTab.Visible = false
+
+local function createTabBtn(text, pos, targetTab)
+    local btn = Instance.new("TextButton", tabHolder)
+    btn.Size = UDim2.new(0.5, -5, 1, 0)
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+    btn.MouseButton1Click:Connect(function()
+        combatTab.Visible = false
+        playerTab.Visible = false
+        targetTab.Visible = true
+    end)
+end
+
+createTabBtn("Combate", UDim2.new(0, 0, 0, 0), combatTab)
+createTabBtn("LocalPlayer", UDim2.new(0.5, 5, 0, 0), playerTab)
+
+local combatLayout = Instance.new("UIListLayout", combatTab)
+combatLayout.Padding = UDim.new(0, 8)
+local playerLayout = Instance.new("UIListLayout", playerTab)
+playerLayout.Padding = UDim.new(0, 8)
+
+--// PAINEL FLUTUANTE (DOCK) - Declarado antes para ser usado no callback
+local floatPanel = Instance.new("Frame", gui)
+floatPanel.Size = UDim2.new(0, 140, 0, 45)
+floatPanel.Position = UDim2.new(0.5, -70, 0.85, 0)
+floatPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+floatPanel.Visible = true
+Instance.new("UICorner", floatPanel).CornerRadius = UDim.new(1, 0)
+local floatStroke = Instance.new("UIStroke", floatPanel)
+floatStroke.Thickness = 2
+makeDraggable(floatPanel)
+
+local floatLayout = Instance.new("UIListLayout", floatPanel)
+floatLayout.FillDirection = Enum.FillDirection.Horizontal
+floatLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+floatLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+floatLayout.Padding = UDim.new(0, 6)
+
+local function createFloatBtn(emoji, varName)
+    local btn = Instance.new("TextButton", floatPanel)
+    btn.Size = UDim2.new(0, 35, 0, 35)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    btn.Text = emoji
+    btn.TextScaled = true
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
+
+    btn.MouseButton1Click:Connect(function()
+        getgenv()[varName] = not getgenv()[varName]
+        btn.BackgroundColor3 = getgenv()[varName] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+    end)
+    
+    RunService.RenderStepped:Connect(function()
+        btn.BackgroundColor3 = getgenv()[varName] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+    end)
+end
+
+createFloatBtn("🤺", "AutoAttack")
+createFloatBtn("⚡", "TeleportOnAttack")
+createFloatBtn("⚔️", "StickMode")
+
+--// SISTEMA DE SLIDER E TOGGLE COM CALLBACK
+local function createSlider(parent, text, min, max, default, varName)
+    local sliderFrame = Instance.new("Frame", parent)
+    sliderFrame.Size = UDim2.new(1, -10, 0, 50)
+    sliderFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    Instance.new("UICorner", sliderFrame).CornerRadius = UDim.new(0, 6)
+
+    local label = Instance.new("TextLabel", sliderFrame)
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.BackgroundTransparency = 1
+    label.Text = text .. ": " .. default
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Font = Enum.Font.GothamSemibold
+
+    local bar = Instance.new("Frame", sliderFrame)
+    bar.Size = UDim2.new(1, -20, 0, 6)
+    bar.Position = UDim2.new(0, 10, 0, 30)
+    bar.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+
+    local fill = Instance.new("Frame", bar)
+    fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+
+    local function update(input)
+        local pos = math.clamp((input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+        fill.Size = UDim2.new(pos, 0, 1, 0)
+        local value = math.floor(min + (max - min) * pos)
+        getgenv()[varName] = value
+        label.Text = text .. ": " .. value
+    end
+
+    bar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            update(input)
+            local move; move = UserInputService.InputChanged:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                    update(input)
+                end
+            end)
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then move:Disconnect() end
+            end)
+        end
+    end)
+end
+
+local function createToggle(parent, text, varName, isDefaultOn, callback)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = UDim2.new(1, -10, 0, 40)
+    btn.BackgroundColor3 = (isDefaultOn and getgenv()[varName]) and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.GothamBold
+    btn.Text = text .. ((isDefaultOn and getgenv()[varName]) and " [ON]" or " [OFF]")
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+
+    btn.MouseButton1Click:Connect(function()
+        getgenv()[varName] = not getgenv()[varName]
+        btn.Text = text .. (getgenv()[varName] and " [ON]" or " [OFF]")
+        btn.BackgroundColor3 = getgenv()[varName] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+        if callback then callback(getgenv()[varName]) end
+    end)
+end
+
+--// CONTEÚDO COMBATE
+createToggle(combatTab, "Auto Attack", "AutoAttack")
+createToggle(combatTab, "Teleport no Ataque", "TeleportOnAttack")
+createToggle(combatTab, "Grudar no Alvo", "StickMode")
+createSlider(combatTab, "Distância Grudar", 0, 15, 3, "StickDistance")
+createSlider(combatTab, "Suavidade (Lag)", 0, 90, 0, "StickSmoothness")
+
+--// CONTEÚDO LOCALPLAYER
+createSlider(playerTab, "Velocidade (Speed)", 16, 150, 16, "WalkSpeedValue")
+createToggle(playerTab, "Pulo Infinito", "InfiniteJump")
+createToggle(playerTab, "Anti-Fling / Ragdoll", "AntiFling")
+createToggle(playerTab, "Mostrar Painel ⚔️", "FloatingPanelVisible", true, function(state)
+    floatPanel.Visible = state
+end)
+
+--// LOOPS DE FUNCIONAMENTO
+RunService.Heartbeat:Connect(function()
+    -- RGB
+    local rgb = Color3.fromHSV(tick() % 5 / 5, 1, 1)
+    title.TextColor3 = rgb
+    mainStroke.Color = rgb
+    floatStroke.Color = rgb
+
+    -- WalkSpeed (Forçado de forma leve)
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = getgenv().WalkSpeedValue
+    end
+
+    -- Grudar (Com Suavidade e Distância ajustáveis)
+    local target, dist = getClosest()
+    if getgenv().StickMode and target and target.Character then
+        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local eRoot = target.Character:FindFirstChild("HumanoidRootPart")
+        if myRoot and eRoot then
+            local goalCFrame = eRoot.CFrame * CFrame.new(0, 0, getgenv().StickDistance)
+            local lerpVal = 1 - (getgenv().StickSmoothness / 100)
+            myRoot.CFrame = myRoot.CFrame:Lerp(goalCFrame, lerpVal)
+        end
+    end
+
+    -- Novo Anti-Fling / Anti-Ragdoll
+    if getgenv().AntiFling and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        local hum = LocalPlayer.Character.Humanoid
+        hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+        hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+        
+        -- Levanta instantaneamente se o jogo tentar te derrubar
+        if hum:GetState() == Enum.HumanoidStateType.Ragdoll or hum:GetState() == Enum.HumanoidStateType.FallingDown then
+            hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+        end
+    end
+end)
+
+-- Pulo Infinito
+UserInputService.JumpRequest:Connect(function()
+    if getgenv().InfiniteJump and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid:ChangeState("Jumping")
+    end
+end)
+
+-- Auto Attack
 task.spawn(function()
     while true do
-        hookRoll()
+        if getgenv().AutoAttack then
+            local target, dist = getClosest()
+            if target and dist <= attackRange then
+                local remote = getRemote()
+                if remote then
+                    remote:FireServer({Key = "TouchATK", State = Enum.UserInputState.Begin})
+                    task.wait(0.05)
+                    remote:FireServer({Key = "TouchATK", State = Enum.UserInputState.End})
+                end
+            end
+        end
+        task.wait(0.12)
+    end
+end)
+
+-- Teleport no Ataque
+task.spawn(function()
+    while true do
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        local btn = pg and pg:FindFirstChild("MobileScr", true) and pg.MobileScr:FindFirstChild("ATK", true)
+        if btn and not btn:FindFirstChild("TpHook") then
+            Instance.new("BoolValue", btn).Name = "TpHook"
+            btn.MouseButton1Down:Connect(function()
+                if getgenv().TeleportOnAttack then
+                    local target = getClosest()
+                    if target and target.Character then
+                        local myRoot = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        local eRoot = target.Character:FindFirstChild("HumanoidRootPart")
+                        if myRoot and eRoot then
+                            myRoot.CFrame = eRoot.CFrame * CFrame.new(0, 0, getgenv().StickDistance)
+                        end
+                    end
+                end
+            end)
+        end
         task.wait(1)
+    end
+end)
+
+-- ESP / Highlight Loop
+RunService.RenderStepped:Connect(function()
+    local target = getClosest()
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            local hl = plr.Character:FindFirstChild("DW_Highlight") or Instance.new("Highlight", plr.Character)
+            hl.Name = "DW_Highlight"
+            hl.FillTransparency = 0.5
+            if isWhitelisted(plr) then
+                hl.FillColor = Color3.new(0, 1, 0)
+                hl.Enabled = true
+            elseif plr == target then
+                hl.FillColor = Color3.new(1, 0, 0)
+                hl.Enabled = true
+            else
+                hl.Enabled = false
+            end
+        end
     end
 end)
