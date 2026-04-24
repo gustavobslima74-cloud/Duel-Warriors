@@ -1,13 +1,20 @@
 local lp = game:GetService("Players").LocalPlayer
-print("🔍 Iniciando Espião de Combo...")
+print("🔍 Iniciando Espião Avançado de Combo...")
 
+-- Vigia coisas que já existem na tela
 for _, elemento in pairs(lp.PlayerGui:GetDescendants()) do
-    if elemento:IsA("Frame") or elemento:IsA("ImageLabel") then
+    if elemento:IsA("GuiObject") then
         elemento.Changed:Connect(function(propriedade)
-            -- Se o quadrado mudar de cor, transparência ou tamanho ao atacar, ele avisa!
-            if propriedade == "BackgroundColor3" or propriedade == "BackgroundTransparency" or propriedade == "ImageColor3" then
-                print("⚠️ ACHEI UMA MUDANÇA! Nome:", elemento.Name, "| Pasta Pai:", elemento.Parent.Name)
+            if propriedade == "Visible" or propriedade == "Size" or propriedade == "Image" or propriedade == "ImageRectOffset" then
+                print("⚠️ ALTERADO (" .. propriedade .. "):", elemento.Name, "| Pasta Pai:", elemento.Parent and elemento.Parent.Name or "Nenhuma")
             end
         end)
     end
 end
+
+-- Vigia coisas que são criadas/destruídas na hora do ataque
+lp.PlayerGui.DescendantAdded:Connect(function(elemento)
+    if elemento:IsA("GuiObject") then
+        print("🆕 CRIADO NA TELA:", elemento.Name, "| Pasta Pai:", elemento.Parent and elemento.Parent.Name or "Nenhuma")
+    end
+end)
