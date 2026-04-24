@@ -1,20 +1,33 @@
 local lp = game:GetService("Players").LocalPlayer
-print("🔍 Iniciando Espião Avançado de Combo...")
+print("🔍 Iniciando Espião Filtrado...")
 
--- Vigia coisas que já existem na tela
+-- Nomes para ignorar e evitar spam no console
+local blacklist = {
+    ["Value Frame"] = true,
+    ["progressframe"] = true,
+    ["TouchControl"] = true -- Ignora o joystick caso ele spamme
+}
+
+-- Vigia coisas na tela (com filtro)
 for _, elemento in pairs(lp.PlayerGui:GetDescendants()) do
     if elemento:IsA("GuiObject") then
-        elemento.Changed:Connect(function(propriedade)
-            if propriedade == "Visible" or propriedade == "Size" or propriedade == "Image" or propriedade == "ImageRectOffset" then
-                print("⚠️ ALTERADO (" .. propriedade .. "):", elemento.Name, "| Pasta Pai:", elemento.Parent and elemento.Parent.Name or "Nenhuma")
-            end
-        end)
+        -- Verifica se o elemento ou o pai dele não estão na blacklist
+        local nomePai = elemento.Parent and elemento.Parent.Name or ""
+        if not blacklist[elemento.Name] and not blacklist[nomePai] then
+            
+            elemento.Changed:Connect(function(propriedade)
+                if propriedade == "Visible" or propriedade == "Size" or propriedade == "Image" or propriedade == "BackgroundColor3" then
+                    print("⚠️ ALTERADO (" .. propriedade .. "):", elemento.Name, "| Pasta Pai:", nomePai)
+                end
+            end)
+            
+        end
     end
 end
 
--- Vigia coisas que são criadas/destruídas na hora do ataque
+-- Vigia coisas sendo criadas na hora
 lp.PlayerGui.DescendantAdded:Connect(function(elemento)
-    if elemento:IsA("GuiObject") then
+    if elemento:IsA("GuiObject") and not blacklist[elemento.Name] then
         print("🆕 CRIADO NA TELA:", elemento.Name, "| Pasta Pai:", elemento.Parent and elemento.Parent.Name or "Nenhuma")
     end
 end)
