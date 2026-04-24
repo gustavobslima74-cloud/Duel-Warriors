@@ -19,8 +19,8 @@ getgenv().AntiFling = false
 
 -- VARS EM TESTE
 getgenv().HealthESP = false
-getgenv().AutoParry = false
-getgenv().FlingPlayer = false
+getgenv().MyHealth = false
+getgenv().CharAimLock = false
 
 local whitelist = {}
 local attackRange = 15
@@ -58,6 +58,17 @@ end
 local gui = Instance.new("ScreenGui", CoreGui)
 gui.Name = "DuelWarriorsUI"
 
+-- MEU HP LABEL (HUD)
+local myHealthLbl = Instance.new("TextLabel", gui)
+myHealthLbl.Size = UDim2.new(0, 150, 0, 25)
+myHealthLbl.Position = UDim2.new(1, -160, 0, 50) -- Fica no topo direito da tela
+myHealthLbl.BackgroundTransparency = 1
+myHealthLbl.Font = Enum.Font.GothamBold
+myHealthLbl.TextSize = 14
+myHealthLbl.TextXAlignment = Enum.TextXAlignment.Right
+myHealthLbl.TextStrokeTransparency = 0
+myHealthLbl.Visible = false
+
 local function makeDraggable(guiObject, handle)
     local dragging, dragInput, dragStart, startPos
     local target = handle or guiObject
@@ -88,11 +99,11 @@ Instance.new("UICorner", main)
 local mainStroke = Instance.new("UIStroke", main); mainStroke.Thickness = 3
 makeDraggable(main)
 
--- BOTÃO DE ABRIR (CIRCULAR)
+-- BOTÃO DE ABRIR (CÍRCULO PERFEITO)
 local openBtn = Instance.new("TextButton", gui)
 openBtn.Size = UDim2.new(0, 45, 0, 45); openBtn.Position = UDim2.new(1, -60, 0, 20)
 openBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20); openBtn.Text = "DW"; openBtn.TextColor3 = Color3.new(1,1,1); openBtn.TextScaled = true
-Instance.new("UICorner", openBtn, {CornerRadius = UDim.new(0.5, 0)}) 
+Instance.new("UICorner", openBtn, {CornerRadius = UDim.new(1, 0)}) 
 makeDraggable(openBtn)
 openBtn.MouseButton1Click:Connect(function() main.Visible = not main.Visible end)
 
@@ -180,9 +191,9 @@ createToggle(tabs.Player, "Pulo Infinito", "InfiniteJump")
 createToggle(tabs.Player, "Anti-Ragdoll", "AntiFling")
 
 -- Conteúdo Aba "EM TESTE"
-createToggle(tabs.Test, "Health ESP (Números)", "HealthESP")
-createToggle(tabs.Test, "Auto Parry (Roll Certo)", "AutoParry")
-createToggle(tabs.Test, "Fling Target (Giro Mortal)", "FlingPlayer")
+createToggle(tabs.Test, "Health ESP (5 Perto)", "HealthESP")
+createToggle(tabs.Test, "Meu HP na Tela", "MyHealth")
+createToggle(tabs.Test, "Aimbot (Olhar P/ Inimigo)", "CharAimLock")
 
 --// ABA WHITELIST (DINÂMICA)
 task.spawn(function()
@@ -220,7 +231,8 @@ Instance.new("UICorner", moveHandle, {CornerRadius = UDim.new(1,0)}); makeDragga
 local function createFloatBtn(emoji, varName)
     local b = Instance.new("TextButton", floatPanel)
     b.Size = UDim2.new(0, 35, 0, 35); b.Text = emoji; b.TextScaled = true; b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    Instance.new("UICorner", b, {CornerRadius = UDim.new(0.5, 0)}) 
+    -- BOTÕES FLUTUANTES AGORA SÃO CÍRCULOS PERFEITOS
+    Instance.new("UICorner", b, {CornerRadius = UDim.new(1, 0)}) 
     
     b.MouseButton1Click:Connect(function() getgenv()[varName] = not getgenv()[varName] end)
     RunService.RenderStepped:Connect(function()
@@ -230,9 +242,7 @@ end
 
 createFloatBtn("🤺", "AutoAttack"); createFloatBtn("⚡", "TeleportOnAttack"); createFloatBtn("⚔️", "StickMode")
 
---// LOOPS PRINCIPAIS
-local lastRollTime = 0
-
+--// LOOPS PRINCIPAIS E FÍSICA
 RunService.Stepped:Connect(function()
     -- RGB
     local rgb = Color3.fromHSV(tick() % 5 / 5, 1, 1)
@@ -249,32 +259,30 @@ RunService.Stepped:Connect(function()
     local eRoot = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
 
     -- Grudar Normal
-    if getgenv().StickMode and myRoot and eRoot and not getgenv().FlingPlayer then
+    if getgenv().StickMode and myRoot and eRoot then
         local goal = eRoot.CFrame * CFrame.new(0, 0, getgenv().StickDistance)
         myRoot.CFrame = myRoot.CFrame:Lerp(goal, 1 - (getgenv().StickSmoothness/100))
     end
     
-    -- Fling Player (Prioridade sobre o Grudar normal)
-    if getgenv().FlingPlayer and myRoot and eRoot then
-        -- Acelera absurdamente a rotação e teletransporta para dentro do inimigo
-        myRoot.RotVelocity = Vector3.new(0, 50000, 0)
-        myRoot.Velocity = Vector3.new(0, 0, 0)
-        myRoot.CFrame = eRoot.CFrame
+    -- AIMBOT (Lock-on do Personagem)
+    if getgenv().CharAimLock and myRoot and eRoot then
+        -- Força o personagem a olhar pro inimigo mantendo a altura Y (não entorta o boneco pra cima/baixo)
+        local lookPos = Vector3.new(eRoot.Position.X, myRoot.Position.Y, eRoot.Position.Z)
+        myRoot.CFrame = CFrame.new(myRoot.Position, lookPos)
     end
     
-    -- Auto Parry (ROLL Tático)
-    if getgenv().AutoParry and target and dist < 8 then
-        -- Simula recarga do botão ROLL pra não espamar (1 segundo)
-        if tick() - lastRollTime > 1.5 then
-            local rollBtn = LocalPlayer.PlayerGui:FindFirstChild("ROLL", true)
-            if rollBtn and rollBtn:IsA("GuiButton") then
-                -- Aciona o botão na tela simulando o toque
-                for _, conn in pairs(getconnections(rollBtn.MouseButton1Down)) do
-                    conn:Fire()
-                end
-                lastRollTime = tick()
-            end
-        end
+    -- Atualizador do Meu HP
+    if getgenv().MyHealth and myHum then
+        myHealthLbl.Visible = true
+        local hp = math.floor(myHum.Health)
+        local max = math.floor(myHum.MaxHealth)
+        myHealthLbl.Text = "MEU HP: " .. hp .. " / " .. max
+        
+        if hp > (max * 0.6) then myHealthLbl.TextColor3 = Color3.fromRGB(0, 255, 0)
+        elseif hp > (max * 0.3) then myHealthLbl.TextColor3 = Color3.fromRGB(255, 255, 0)
+        else myHealthLbl.TextColor3 = Color3.fromRGB(255, 0, 0) end
+    else
+        myHealthLbl.Visible = false
     end
     
     -- Anti Ragdoll
@@ -329,11 +337,30 @@ task.spawn(function()
     end
 end)
 
--- Highlights & Health ESP Numerico
+-- Highlights & Health ESP (Top 5 mais próximos)
 RunService.RenderStepped:Connect(function()
+    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     local target = getClosest()
+    
+    -- Calcula quem são os 5 mais próximos
+    local plrsDist = {}
+    if myRoot then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                local d = (myRoot.Position - p.Character.HumanoidRootPart.Position).Magnitude
+                table.insert(plrsDist, {plr = p, dist = d})
+            end
+        end
+        table.sort(plrsDist, function(a,b) return a.dist < b.dist end)
+    end
+    
+    local top5 = {}
+    for i=1, math.min(5, #plrsDist) do
+        top5[plrsDist[i].plr] = true
+    end
+
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") and p.Character:FindFirstChild("Humanoid") then
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
             local char = p.Character
             
             -- Lógica do Highlight (ESP de Cor)
@@ -343,36 +370,32 @@ RunService.RenderStepped:Connect(function()
             elseif p == target then hl.FillColor = Color3.new(1,0,0); hl.Enabled = true
             else hl.Enabled = false end
             
-            -- Lógica do Health ESP (Números Flutuantes)
-            local bbGui = char.Head:FindFirstChild("DW_HealthESP")
-            if getgenv().HealthESP then
+            -- Lógica do Health ESP Restrito ao Top 5
+            local bbGui = char.HumanoidRootPart:FindFirstChild("DW_HealthESP")
+            if getgenv().HealthESP and top5[p] then
                 if not bbGui then
-                    bbGui = Instance.new("BillboardGui", char.Head)
+                    bbGui = Instance.new("BillboardGui", char.HumanoidRootPart)
                     bbGui.Name = "DW_HealthESP"
-                    bbGui.Size = UDim2.new(0, 100, 0, 40)
-                    bbGui.StudsOffset = Vector3.new(0, 2, 0)
+                    bbGui.Size = UDim2.new(0, 80, 0, 30)
+                    -- Posição: Ao lado direito e mais abaixo, próximo aos pés/cintura
+                    bbGui.StudsOffset = Vector3.new(2.5, -1.5, 0)
                     bbGui.AlwaysOnTop = true
                     
                     local txt = Instance.new("TextLabel", bbGui)
                     txt.Size = UDim2.new(1, 0, 1, 0)
                     txt.BackgroundTransparency = 1
                     txt.Font = Enum.Font.GothamBold
-                    txt.TextSize = 14
+                    txt.TextSize = 11 -- Fonte Pequena
                     txt.TextStrokeTransparency = 0
                 end
                 
                 local hp = math.floor(char.Humanoid.Health)
                 local maxHp = math.floor(char.Humanoid.MaxHealth)
-                bbGui.TextLabel.Text = "[ " .. hp .. " / " .. maxHp .. " ]"
+                bbGui.TextLabel.Text = hp .. " / " .. maxHp
                 
-                -- Muda cor dependendo da vida
-                if hp > (maxHp * 0.6) then
-                    bbGui.TextLabel.TextColor3 = Color3.fromRGB(0, 255, 0) -- Verde
-                elseif hp > (maxHp * 0.3) then
-                    bbGui.TextLabel.TextColor3 = Color3.fromRGB(255, 255, 0) -- Amarelo
-                else
-                    bbGui.TextLabel.TextColor3 = Color3.fromRGB(255, 0, 0) -- Vermelho
-                end
+                if hp > (maxHp * 0.6) then bbGui.TextLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+                elseif hp > (maxHp * 0.3) then bbGui.TextLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+                else bbGui.TextLabel.TextColor3 = Color3.fromRGB(255, 0, 0) end
             else
                 if bbGui then bbGui:Destroy() end
             end
