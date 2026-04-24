@@ -15,6 +15,7 @@ getgenv().CharAimLock = false
 getgenv().FloatingPanelVisible = false
 getgenv().SeparatedMode = false
 getgenv().RecordingMode = false
+getgenv().LockUI = false -- NOVA VARIÁVEL DE TRAVA
 getgenv().HighlightEnemy = true
 getgenv().HighlightFriendly = true
 
@@ -74,6 +75,9 @@ local function makeDraggable(guiObject, handle)
     local dragging, dragInput, dragStart, startPos
     local target = handle or guiObject
     target.InputBegan:Connect(function(input)
+        -- Trava de segurança (se LockUI ou RecordingMode estiverem ativos, ignora o clique de arrastar)
+        if getgenv().LockUI or getgenv().RecordingMode then return end
+        
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true; dragStart = input.Position; startPos = guiObject.Position
             input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
@@ -83,7 +87,8 @@ local function makeDraggable(guiObject, handle)
         if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
     end)
     RunService.RenderStepped:Connect(function()
-        if dragging and dragInput then
+        -- Trava contínua para evitar bugs durante o arrasto
+        if dragging and dragInput and not getgenv().LockUI and not getgenv().RecordingMode then
             local delta = dragInput.Position - dragStart
             guiObject.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
@@ -102,9 +107,17 @@ local openBtn = Instance.new("TextButton", gui)
 openBtn.Size = UDim2.new(0, 45, 0, 45); openBtn.Position = UDim2.new(1, -60, 0, 20)
 openBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20); openBtn.Text = "DW"; openBtn.TextColor3 = Color3.new(1,1,1); openBtn.TextScaled = true
 Instance.new("UICorner", openBtn, {CornerRadius = UDim.new(1, 0)}) 
-Instance.new("UIAspectRatioConstraint", openBtn, {AspectRatio = 1}) -- Garante o círculo
+Instance.new("UIAspectRatioConstraint", openBtn, {AspectRatio = 1})
 makeDraggable(openBtn)
-openBtn.MouseButton1Click:Connect(function() main.Visible = not main.Visible end)
+
+-- LÓGICA DE ABRIR/FECHAR COM RESET DE POSIÇÃO
+openBtn.MouseButton1Click:Connect(function() 
+    main.Visible = not main.Visible 
+    if main.Visible then
+        -- Volta pro centro certinho toda vez que abre
+        main.Position = UDim2.new(0.5, -140, 0.5, -220)
+    end
+end)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1, 0, 0, 35); title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.0"; title.Font = "GothamBlack"; title.TextScaled = true
@@ -198,7 +211,7 @@ local function createFloatBtn(emoji, varName)
     b.Size = UDim2.new(0, 35, 0, 35); b.Text = emoji; b.TextScaled = true; b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     Instance.new("UICorner", b, {CornerRadius = UDim.new(1, 0)})
     Instance.new("UIAspectRatioConstraint", b, {AspectRatio = 1})
-    makeDraggable(b) -- Torna arrastável quando separado
+    makeDraggable(b)
     
     table.insert(FloatingButtonsList, b)
     b.Parent = floatPanel
@@ -230,6 +243,8 @@ createToggle(tabs.Player, "Pulo Infinito", "InfiniteJump")
 createToggle(tabs.Player, "Anti-Ragdoll", "AntiFling")
 
 -- Conteúdo Aba BYPASS
+createToggle(tabs.Bypass, "Travar Posições UI", "LockUI") -- NOVO BOTÃO DE TRAVA
+createToggle(tabs.Bypass, "Modo Gravação (Invisível)", "RecordingMode")
 createToggle(tabs.Bypass, "Separar Botões", "SeparatedMode", function(state)
     local isVisible = getgenv().FloatingPanelVisible
     if state then
@@ -247,7 +262,6 @@ createToggle(tabs.Bypass, "Separar Botões", "SeparatedMode", function(state)
         floatPanel.Visible = isVisible
     end
 end)
-createToggle(tabs.Bypass, "Modo Gravação (Invisível)", "RecordingMode")
 
 -- Conteúdo Aba TESTE
 createToggle(tabs.Test, "Health ESP (5 Perto)", "HealthESP")
@@ -291,7 +305,6 @@ RunService.Stepped:Connect(function()
     for _, btn in pairs(FloatingButtonsList) do
         btn.BackgroundTransparency = isRec and 1 or 0
         btn.TextTransparency = isRec and 1 or 0
-        -- Cores dinâmicas para mostrar estado quando não tá gravando
         if not isRec then
             btn.BackgroundColor3 = getgenv()[btn.Name] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
         end
