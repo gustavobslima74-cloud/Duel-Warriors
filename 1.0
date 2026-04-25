@@ -21,9 +21,6 @@ getgenv().HighlightFriendly = true
 getgenv().LeftSwipeBind = "AutoAttack"
 getgenv().RightSwipeBind = "CharAimLock"
 
--- Vars da Aba UI
-getgenv().ShowOldPanel = false
-
 getgenv().StickDistance = 3
 getgenv().StickSmoothness = 0
 getgenv().WalkSpeedValue = 16
@@ -79,7 +76,6 @@ myHealthLbl.TextSize = 14; myHealthLbl.TextXAlignment = Enum.TextXAlignment.Righ
 local function makeDraggable(guiObject, handle)
     local dragging, dragInput, dragStart, startPos
     local target = handle or guiObject
-    
     target.InputBegan:Connect(function(input)
         if getgenv().LockUI or getgenv().RecordingMode then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -105,20 +101,17 @@ main.BackgroundColor3 = Color3.fromRGB(15, 15, 15); main.Visible = false; Instan
 local mainStroke = Instance.new("UIStroke", main); mainStroke.Thickness = 3
 makeDraggable(main)
 
--- BOTÃO X (Ajustado)
 local closeMenuBtn = Instance.new("TextButton", main)
 closeMenuBtn.Size = UDim2.new(0, 30, 0, 30); closeMenuBtn.Position = UDim2.new(1, -30, 0, 2)
 closeMenuBtn.BackgroundTransparency = 1; closeMenuBtn.Text = "X"; closeMenuBtn.TextColor3 = Color3.new(1, 0, 0)
 closeMenuBtn.Font = Enum.Font.GothamBlack; closeMenuBtn.TextSize = 18
 closeMenuBtn.MouseButton1Click:Connect(function() main.Visible = false end)
 
--- TÍTULO (Ajustado para não tampar o X)
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1, -40, 0, 35); title.Position = UDim2.new(0, 10, 0, 0)
 title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.0"; title.Font = "GothamBlack"
 title.TextScaled = true; title.TextXAlignment = Enum.TextXAlignment.Left
 
--- BOTÃO DE ABRIR PADRÃO
 local openBtn = Instance.new("TextButton", gui)
 openBtn.Size = UDim2.new(0, 45, 0, 45); openBtn.Position = UDim2.new(1, -60, 0, 20)
 openBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20); openBtn.Text = "DW"; openBtn.TextColor3 = Color3.new(1,1,1); openBtn.TextScaled = true
@@ -130,11 +123,11 @@ openBtn.MouseButton1Click:Connect(function()
     if main.Visible then main.Position = UDim2.new(0.5, -140, 0.5, -160) end
 end)
 
---// ABAS SETUP (COM SCROLL HORIZONTAL E NOMES COMPLETOS)
+--// ABAS SETUP
 local tabHolder = Instance.new("ScrollingFrame", main)
 tabHolder.Size = UDim2.new(1, -10, 0, 30); tabHolder.Position = UDim2.new(0, 5, 0, 40)
 tabHolder.BackgroundTransparency = 1; tabHolder.ScrollBarThickness = 0
-tabHolder.CanvasSize = UDim2.new(0, 430, 0, 0) -- Espaço para as abas rolarem pro lado
+tabHolder.CanvasSize = UDim2.new(0, 450, 0, 0) 
 local tabLayoutH = Instance.new("UIListLayout", tabHolder)
 tabLayoutH.FillDirection = Enum.FillDirection.Horizontal; tabLayoutH.Padding = UDim.new(0, 5)
 
@@ -150,10 +143,7 @@ local tabs = {
 for _, t in pairs(tabs) do
     t.Size = UDim2.new(1, -20, 1, -85); t.Position = UDim2.new(0, 10, 0, 75)
     t.BackgroundTransparency = 1; t.ScrollBarThickness = 0; t.Visible = false
-    
-    local layout = Instance.new("UIListLayout", t)
-    layout.Padding = UDim.new(0, 8)
-    -- Ajuste dinâmico do Scroll Vertical
+    local layout = Instance.new("UIListLayout", t); layout.Padding = UDim.new(0, 8)
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         t.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
     end)
@@ -162,7 +152,7 @@ tabs.Combat.Visible = true
 
 local function createTabBtn(text, targetTab)
     local btn = Instance.new("TextButton", tabHolder)
-    btn.Size = UDim2.new(0, 65, 1, 0); btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    btn.Size = UDim2.new(0, 70, 1, 0); btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     btn.Text = text; btn.TextColor3 = Color3.new(1, 1, 1); btn.Font = "GothamBold"; btn.TextSize = 10; btn.TextScaled = true
     Instance.new("UICorner", btn)
     btn.MouseButton1Click:Connect(function()
@@ -172,7 +162,7 @@ local function createTabBtn(text, targetTab)
 end
 
 createTabBtn("Combate", tabs.Combat)
-createTabBtn("UI", tabs.UI)
+createTabBtn("UI / Painel", tabs.UI)
 createTabBtn("Player", tabs.Player)
 createTabBtn("Whitelist", tabs.Whitelist)
 createTabBtn("Bypass", tabs.Bypass)
@@ -182,23 +172,15 @@ createTabBtn("Teste", tabs.Test)
 local function createToggle(parent, text, varName, callback)
     local btn = Instance.new("TextButton", parent)
     btn.Size = UDim2.new(1, -5, 0, 38); btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    
     local isGlobal = getgenv()[varName] ~= nil
     local currentState = isGlobal and getgenv()[varName] or false
-    
     btn.Text = text .. (currentState and " [ON]" or " [OFF]"); btn.TextColor3 = Color3.new(1,1,1); btn.Font = "GothamBold"
     Instance.new("UICorner", btn)
-    if currentState then btn.BackgroundColor3 = Color3.fromRGB(0, 150, 0) end
-
     MenuToggles[varName] = {Btn = btn, Text = text}
-
     btn.MouseButton1Click:Connect(function()
         if isGlobal then getgenv()[varName] = not getgenv()[varName] end
         local newState = isGlobal and getgenv()[varName] or not currentState
         if not isGlobal then currentState = newState end
-        
-        btn.Text = text .. (newState and " [ON]" or " [OFF]")
-        btn.BackgroundColor3 = newState and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
         if callback then callback(newState, btn) end
     end)
 end
@@ -225,71 +207,51 @@ end
 
 local function createBindCycler(parent, title, varToChange)
     local options = {"AutoAttack", "CharAimLock", "TeleportOnAttack", "StickMode"}
-    local btn = Instance.new("TextButton", parent)
-    btn.Size = UDim2.new(1, -5, 0, 38); btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    btn.TextColor3 = Color3.new(1,1,1); btn.Font = "GothamBold"
-    Instance.new("UICorner", btn)
-
-    local function getIndex()
-        for i, v in ipairs(options) do if v == getgenv()[varToChange] then return i end end return 1
-    end
-    
+    local btn = Instance.new("TextButton", parent); btn.Size = UDim2.new(1, -5, 0, 38); btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.TextColor3 = Color3.new(1,1,1); btn.Font = "GothamBold"; Instance.new("UICorner", btn)
+    local function getIndex() for i, v in ipairs(options) do if v == getgenv()[varToChange] then return i end end return 1 end
     btn.Text = title .. ": " .. options[getIndex()]
     btn.MouseButton1Click:Connect(function()
-        local nextId = getIndex() + 1
-        if nextId > #options then nextId = 1 end
-        getgenv()[varToChange] = options[nextId]
-        btn.Text = title .. ": " .. options[nextId]
+        local nextId = getIndex() + 1; if nextId > #options then nextId = 1 end
+        getgenv()[varToChange] = options[nextId]; btn.Text = title .. ": " .. options[nextId]
     end)
 end
 
---// PAINEL ANTIGO (DOCK)
+--// PAINEL ANTIGO E BOTÕES FLUTUANTES
 local oldPanel = Instance.new("Frame", gui); oldPanel.Name = "OldPanel"
 oldPanel.Size = UDim2.new(0, 180, 0, 40); oldPanel.Position = UDim2.new(0.5, -90, 0.85, 0)
 oldPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 20); oldPanel.Visible = false; Instance.new("UICorner", oldPanel, {CornerRadius = UDim.new(1,0)})
 local oldStroke = Instance.new("UIStroke", oldPanel); oldStroke.Thickness = 2
 local oldLayout = Instance.new("UIListLayout", oldPanel); oldLayout.FillDirection = "Horizontal"; oldLayout.HorizontalAlignment = "Center"; oldLayout.VerticalAlignment = "Center"; oldLayout.Padding = UDim.new(0, 8)
-
-local moveHandle = Instance.new("TextLabel", oldPanel)
-moveHandle.Size = UDim2.new(0, 20, 0, 20); moveHandle.Position = UDim2.new(0, -5, 1, -15)
+local moveHandle = Instance.new("TextLabel", oldPanel); moveHandle.Size = UDim2.new(0, 20, 0, 20); moveHandle.Position = UDim2.new(0, -5, 1, -15)
 moveHandle.BackgroundColor3 = Color3.fromRGB(40,40,40); moveHandle.Text = "+"; moveHandle.TextColor3 = Color3.new(1,1,1)
 Instance.new("UICorner", moveHandle, {CornerRadius = UDim.new(1,0)}); makeDraggable(oldPanel, moveHandle)
 
 local OldPanelBtns = {}
 local function createOldPanelBtn(emoji, varName)
-    local b = Instance.new("TextButton", oldPanel)
-    b.Size = UDim2.new(0, 30, 0, 30); b.Text = emoji; b.TextScaled = true; b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    Instance.new("UICorner", b, {CornerRadius = UDim.new(1, 0)})
-    Instance.new("UIAspectRatioConstraint", b, {AspectRatio = 1})
+    local b = Instance.new("TextButton", oldPanel); b.Size = UDim2.new(0, 30, 0, 30); b.Text = emoji; b.TextScaled = true; b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    Instance.new("UICorner", b, {CornerRadius = UDim.new(1, 0)}); Instance.new("UIAspectRatioConstraint", b, {AspectRatio = 1})
     b.MouseButton1Click:Connect(function() getgenv()[varName] = not getgenv()[varName] end)
     table.insert(OldPanelBtns, {Btn = b, Var = varName})
 end
 createOldPanelBtn("🤺", "AutoAttack"); createOldPanelBtn("⚡", "TeleportOnAttack"); createOldPanelBtn("⚔️", "StickMode"); createOldPanelBtn("👁️", "CharAimLock")
 
---// BOTÕES FLUTUANTES INDIVIDUAIS
 local function spawnFloatingBtn(emoji, varName)
     if ActiveFloatingButtons[varName] then return end 
-    local frame = Instance.new("Frame", gui)
-    frame.Size = UDim2.new(0, 32, 0, 32); frame.Position = UDim2.new(0.5, math.random(-80, 80), 0.5, math.random(-80, 80))
+    local frame = Instance.new("Frame", gui); frame.Size = UDim2.new(0, 32, 0, 32); frame.Position = UDim2.new(0.5, math.random(-80, 80), 0.5, math.random(-80, 80))
     frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20); Instance.new("UICorner", frame, {CornerRadius = UDim.new(1, 0)})
     Instance.new("UIAspectRatioConstraint", frame, {AspectRatio = 1})
-    local btn = Instance.new("TextButton", frame)
-    btn.Size = UDim2.new(1, 0, 1, 0); btn.BackgroundTransparency = 1; btn.Text = emoji; btn.TextScaled = true
-    Instance.new("UICorner", btn, {CornerRadius = UDim.new(1, 0)})
-    makeDraggable(frame, btn)
-    local xBtn = Instance.new("TextButton", frame)
-    xBtn.Size = UDim2.new(0, 14, 0, 14); xBtn.Position = UDim2.new(1, -8, 0, -5)
+    local btn = Instance.new("TextButton", frame); btn.Size = UDim2.new(1, 0, 1, 0); btn.BackgroundTransparency = 1; btn.Text = emoji; btn.TextScaled = true
+    Instance.new("UICorner", btn, {CornerRadius = UDim.new(1, 0)}); makeDraggable(frame, btn)
+    local xBtn = Instance.new("TextButton", frame); xBtn.Size = UDim2.new(0, 14, 0, 14); xBtn.Position = UDim2.new(1, -8, 0, -5)
     xBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0); xBtn.Text = "X"; xBtn.TextColor3 = Color3.new(1,1,1); xBtn.Font = Enum.Font.GothamBold; xBtn.TextScaled = true
     Instance.new("UICorner", xBtn, {CornerRadius = UDim.new(1, 0)})
-    
     btn.MouseButton1Click:Connect(function() getgenv()[varName] = not getgenv()[varName] end)
     xBtn.MouseButton1Click:Connect(function() frame:Destroy() ActiveFloatingButtons[varName] = nil end)
     ActiveFloatingButtons[varName] = {Frame = frame, Btn = btn}
 end
 
 --// CONTEÚDO ABAS
-
--- ABA COMBATE
 createToggle(tabs.Combat, "Auto Attack", "AutoAttack")
 createToggle(tabs.Combat, "Teleport no Ataque", "TeleportOnAttack")
 createToggle(tabs.Combat, "Grudar no Alvo", "StickMode")
@@ -299,40 +261,41 @@ createToggle(tabs.Combat, "Highlight Inimigo", "HighlightEnemy")
 createSlider(tabs.Combat, "Distância Grudar", 0, 15, 3, "StickDistance")
 createSlider(tabs.Combat, "Suavidade", 0, 95, 0, "StickSmoothness")
 
--- ABA UI (GESTOS, PAINÉIS E TRAVA)
 createToggle(tabs.UI, "Travar Posições UI", "LockUI")
 createBindCycler(tabs.UI, "Gesto Esquerdo", "LeftSwipeBind")
 createBindCycler(tabs.UI, "Gesto Direito", "RightSwipeBind")
 createToggle(tabs.UI, "Mostrar Painel Fixo", "ShowOldPanel", function(state) oldPanel.Visible = state end)
-createToggle(tabs.UI, "+ Float Auto Attack", "UI_f1", function(s) if s then spawnFloatingBtn("🤺", "AutoAttack") end end)
-createToggle(tabs.UI, "+ Float Aimbot", "UI_f2", function(s) if s then spawnFloatingBtn("👁️", "CharAimLock") end end)
-createToggle(tabs.UI, "+ Float Teleport", "UI_f3", function(s) if s then spawnFloatingBtn("⚡", "TeleportOnAttack") end end)
-createToggle(tabs.UI, "+ Float Grudar", "UI_f4", function(s) if s then spawnFloatingBtn("⚔️", "StickMode") end end)
+createToggle(tabs.UI, "+ Float Auto Attack", "uif1", function(s) if s then spawnFloatingBtn("🤺", "AutoAttack") end end)
+createToggle(tabs.UI, "+ Float Aimbot", "uif2", function(s) if s then spawnFloatingBtn("👁️", "CharAimLock") end end)
+createToggle(tabs.UI, "+ Float Teleport", "uif3", function(s) if s then spawnFloatingBtn("⚡", "TeleportOnAttack") end end)
+createToggle(tabs.UI, "+ Float Grudar", "uif4", function(s) if s then spawnFloatingBtn("⚔️", "StickMode") end end)
 
--- ABA PLAYER
 createSlider(tabs.Player, "Velocidade (Speed)", 16, 200, 16, "WalkSpeedValue")
 createToggle(tabs.Player, "Pulo Infinito", "InfiniteJump")
 createToggle(tabs.Player, "Anti-Ragdoll", "AntiFling")
 createToggle(tabs.Player, "Health ESP (5 Perto)", "HealthESP")
 createToggle(tabs.Player, "Meu HP na Tela", "MyHealth")
 
--- ABA BYPASS
 createToggle(tabs.Bypass, "Modo Gravação (Invisível)", "RecordingMode")
 
--- ABA TESTE
-local testLbl = Instance.new("TextLabel", tabs.Test)
-testLbl.Size = UDim2.new(1, 0, 0, 30); testLbl.BackgroundTransparency = 1; testLbl.Text = "Aguardando novos testes..."; testLbl.TextColor3 = Color3.new(0.6, 0.6, 0.6); testLbl.Font = Enum.Font.Gotham
-
---// ABA WHITELIST
+--// ABA WHITELIST (ORDEM ALFABÉTICA A-Z)
 task.spawn(function()
     while true do
         if tabs.Whitelist.Visible then
+            local currentPlayers = Players:GetPlayers()
+            
+            -- Ordena a tabela de jogadores por DisplayName (ou Name) em ordem alfabética
+            table.sort(currentPlayers, function(a, b)
+                return a.DisplayName:lower() < b.DisplayName:lower()
+            end)
+
             for _, v in pairs(tabs.Whitelist:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
-            for _, p in pairs(Players:GetPlayers()) do
+            
+            for _, p in pairs(currentPlayers) do
                 if p ~= LocalPlayer then
                     local b = Instance.new("TextButton", tabs.Whitelist); b.Size = UDim2.new(1, 0, 0, 30)
                     b.Text = p.DisplayName; b.BackgroundColor3 = isWhitelisted(p) and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(40, 40, 40)
-                    b.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", b)
+                    b.TextColor3 = Color3.new(1,1,1); b.Font = Enum.Font.Gotham; Instance.new("UICorner", b)
                     b.MouseButton1Click:Connect(function()
                         whitelist[p.UserId] = not whitelist[p.UserId]
                         b.BackgroundColor3 = whitelist[p.UserId] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(40, 40, 40)
@@ -340,142 +303,59 @@ task.spawn(function()
                 end
             end
         end
-        task.wait(3)
+        task.wait(4)
     end
 end)
 
---// SISTEMA DE GESTO NATIVO (SWIPES)
+--// SISTEMA DE GESTO NATIVO
 local touchStart = nil
-UserInputService.TouchStarted:Connect(function(touch, gameProcessed)
-    if gameProcessed then return end
-    touchStart = touch.Position
-end)
-
+UserInputService.TouchStarted:Connect(function(touch, gameProcessed) if not gameProcessed then touchStart = touch.Position end end)
 UserInputService.TouchEnded:Connect(function(touch, gameProcessed)
     if not touchStart then return end
-    local drop = touch.Position - touchStart
-    local screen = workspace.CurrentCamera.ViewportSize
-    
-    -- Verifica se deslizou mais de 80px pra baixo a partir do terço superior da tela
+    local drop = touch.Position - touchStart; local screen = workspace.CurrentCamera.ViewportSize
     if drop.Y > 80 and math.abs(drop.X) < 60 and touchStart.Y < (screen.Y * 0.3) then
-        if touchStart.X < (screen.X * 0.33) then
-            -- Gesto Esquerdo (33% da esquerda)
-            local bind = getgenv().LeftSwipeBind
-            getgenv()[bind] = not getgenv()[bind]
-        elseif touchStart.X > (screen.X * 0.66) then
-            -- Gesto Direito (33% da direita)
-            local bind = getgenv().RightSwipeBind
-            getgenv()[bind] = not getgenv()[bind]
-        else
-            -- Gesto Centro (Abre/Fecha o menu)
-            main.Visible = not main.Visible
-            if main.Visible then main.Position = UDim2.new(0.5, -140, 0.5, -160) end
-        end
+        if touchStart.X < (screen.X * 0.33) then local b = getgenv().LeftSwipeBind; getgenv()[b] = not getgenv()[b]
+        elseif touchStart.X > (screen.X * 0.66) then local b = getgenv().RightSwipeBind; getgenv()[b] = not getgenv()[b]
+        else main.Visible = not main.Visible; if main.Visible then main.Position = UDim2.new(0.5, -140, 0.5, -160) end end
     end
     touchStart = nil
 end)
 
---// LOOPS PRINCIPAIS E FÍSICA
+--// LOOPS PRINCIPAIS
 RunService.Stepped:Connect(function()
     for varName, data in pairs(MenuToggles) do
         local state = getgenv()[varName]
-        data.Btn.Text = data.Text .. (state and " [ON]" or " [OFF]")
-        data.Btn.BackgroundColor3 = state and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+        if data.Btn and data.Text then
+            data.Btn.Text = data.Text .. (state and " [ON]" or " [OFF]")
+            data.Btn.BackgroundColor3 = state and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+        end
     end
-
     local rgb = Color3.fromHSV(tick() % 5 / 5, 1, 1)
     title.TextColor3 = rgb; mainStroke.Color = rgb; oldStroke.Color = rgb
-    
     local isRec = getgenv().RecordingMode
-    openBtn.BackgroundTransparency = isRec and 1 or 0
-    openBtn.TextTransparency = isRec and 1 or 0
-    oldPanel.BackgroundTransparency = isRec and 1 or 0
-    oldStroke.Transparency = isRec and 1 or 0
-    moveHandle.BackgroundTransparency = isRec and 1 or 0
-    moveHandle.TextTransparency = isRec and 1 or 0
-    
-    for _, data in pairs(OldPanelBtns) do
-        data.Btn.BackgroundTransparency = isRec and 1 or 0
-        data.Btn.TextTransparency = isRec and 1 or 0
-        if not isRec then data.Btn.BackgroundColor3 = getgenv()[data.Var] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30) end
-    end
-    
-    for varName, data in pairs(ActiveFloatingButtons) do
-        data.Frame.BackgroundTransparency = isRec and 1 or 0
-        data.Btn.TextTransparency = isRec and 1 or 0
-        local xBtn = data.Frame:FindFirstChildOfClass("TextButton")
-        if xBtn then xBtn.Visible = not isRec end
-        if not isRec then data.Frame.BackgroundColor3 = getgenv()[varName] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(20, 20, 20) end
-    end
-
-    local myChar = LocalPlayer.Character
-    local myHum = myChar and myChar:FindFirstChild("Humanoid")
-    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    
-    if myHum then myHum.WalkSpeed = getgenv().WalkSpeedValue end
-
-    local target, dist = getClosest()
-    local eRoot = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
-
-    if getgenv().StickMode and myRoot and eRoot then
-        local goal = eRoot.CFrame * CFrame.new(0, 0, getgenv().StickDistance)
-        myRoot.CFrame = myRoot.CFrame:Lerp(goal, 1 - (getgenv().StickSmoothness/100))
-    end
-    
-    if getgenv().CharAimLock and myRoot and eRoot then
-        local bg = myRoot:FindFirstChild("DW_AimGyro")
-        if not bg then
-            bg = Instance.new("BodyGyro")
-            bg.Name = "DW_AimGyro"
-            bg.MaxTorque = Vector3.new(0, math.huge, 0)
-            bg.P = 500000
-            bg.Parent = myRoot
-        end
-        bg.CFrame = CFrame.lookAt(myRoot.Position, Vector3.new(eRoot.Position.X, myRoot.Position.Y, eRoot.Position.Z))
-    else
-        if myRoot then
-            local bg = myRoot:FindFirstChild("DW_AimGyro")
-            if bg then bg:Destroy() end
-        end
-    end
-    
-    if getgenv().MyHealth and myHum then
-        myHealthLbl.Visible = true
-        local hp = math.floor(myHum.Health)
-        local max = math.floor(myHum.MaxHealth)
-        myHealthLbl.Text = "MEU HP: " .. hp .. " / " .. max
-        if hp > (max * 0.6) then myHealthLbl.TextColor3 = Color3.fromRGB(0, 255, 0)
-        elseif hp > (max * 0.3) then myHealthLbl.TextColor3 = Color3.fromRGB(255, 255, 0)
-        else myHealthLbl.TextColor3 = Color3.fromRGB(255, 0, 0) end
-    else
-        myHealthLbl.Visible = false
-    end
-    
-    if getgenv().AntiFling and myHum then
-        myHum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-        myHum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-        if myHum:GetState() == Enum.HumanoidStateType.Ragdoll then myHum:ChangeState(Enum.HumanoidStateType.GettingUp) end
-    end
+    openBtn.BackgroundTransparency = isRec and 1 or 0; openBtn.TextTransparency = isRec and 1 or 0
+    oldPanel.BackgroundTransparency = isRec and 1 or 0; oldStroke.Transparency = isRec and 1 or 0; moveHandle.Visible = not isRec
+    for _, data in pairs(OldPanelBtns) do data.Btn.BackgroundTransparency = isRec and 1 or 0; data.Btn.TextTransparency = isRec and 1 or 0; if not isRec then data.Btn.BackgroundColor3 = getgenv()[data.Var] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30) end end
+    for varName, data in pairs(ActiveFloatingButtons) do data.Frame.BackgroundTransparency = isRec and 1 or 0; data.Btn.TextTransparency = isRec and 1 or 0; local x = data.Frame:FindFirstChildOfClass("TextButton"); if x then x.Visible = not isRec end; if not isRec then data.Frame.BackgroundColor3 = getgenv()[varName] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(20, 20, 20) end end
+    local char = LocalPlayer.Character; local hum = char and char:FindFirstChild("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if hum then hum.WalkSpeed = getgenv().WalkSpeedValue end
+    local target, dist = getClosest(); local eRoot = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+    if getgenv().StickMode and root and eRoot then root.CFrame = root.CFrame:Lerp(eRoot.CFrame * CFrame.new(0, 0, getgenv().StickDistance), 1 - (getgenv().StickSmoothness/100)) end
+    if getgenv().CharAimLock and root and eRoot then
+        local bg = root:FindFirstChild("DW_AimGyro") or Instance.new("BodyGyro", root); bg.Name = "DW_AimGyro"; bg.MaxTorque = Vector3.new(0, math.huge, 0); bg.P = 500000
+        bg.CFrame = CFrame.lookAt(root.Position, Vector3.new(eRoot.Position.X, root.Position.Y, eRoot.Position.Z))
+    elseif root and root:FindFirstChild("DW_AimGyro") then root.DW_AimGyro:Destroy() end
+    if getgenv().MyHealth and hum then myHealthLbl.Visible = true; myHealthLbl.Text = "MEU HP: "..math.floor(hum.Health).." / "..math.floor(hum.MaxHealth); myHealthLbl.TextColor3 = hum.Health > (hum.MaxHealth*0.6) and Color3.new(0,1,0) or (hum.Health > (hum.MaxHealth*0.3) and Color3.new(1,1,0) or Color3.new(1,0,0)) else myHealthLbl.Visible = false end
+    if getgenv().AntiFling and hum then hum:SetStateEnabled(10, false); hum:SetStateEnabled(1, false); if hum:GetState() == Enum.HumanoidStateType.Ragdoll then hum:ChangeState(Enum.HumanoidStateType.GettingUp) end end
 end)
 
-UserInputService.JumpRequest:Connect(function()
-    if getgenv().InfiniteJump and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid:ChangeState("Jumping")
-    end
-end)
+UserInputService.JumpRequest:Connect(function() if getgenv().InfiniteJump and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid:ChangeState(3) end end)
 
 task.spawn(function()
     while true do
         if getgenv().AutoAttack then
-            local target, dist = getClosest()
-            if target and dist <= attackRange then
-                local r = getRemote()
-                if r then
-                    r:FireServer({Key = "TouchATK", State = Enum.UserInputState.Begin})
-                    task.wait(0.05)
-                    r:FireServer({Key = "TouchATK", State = Enum.UserInputState.End})
-                end
-            end
+            local t, d = getClosest(); if t and d <= attackRange then local r = getRemote(); if r then r:FireServer({Key = "TouchATK", State = Enum.UserInputState.Begin}); task.wait(0.05); r:FireServer({Key = "TouchATK", State = Enum.UserInputState.End}) end end
         end
         task.wait(0.1)
     end
@@ -483,17 +363,10 @@ end)
 
 task.spawn(function()
     while true do
-        local btn = LocalPlayer.PlayerGui:FindFirstChild("ATK", true)
-        if btn and btn:IsA("GuiButton") and not btn:FindFirstChild("TpHook") then
-            Instance.new("BoolValue", btn).Name = "TpHook"
-            btn.MouseButton1Down:Connect(function()
-                if getgenv().TeleportOnAttack then
-                    local target = getClosest()
-                    if target and target.Character then
-                        LocalPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, getgenv().StickDistance)
-                    end
-                end
-            end)
+        local b = LocalPlayer.PlayerGui:FindFirstChild("ATK", true)
+        if b and b:IsA("GuiButton") and not b:FindFirstChild("TpHook") then
+            Instance.new("BoolValue", b).Name = "TpHook"
+            b.MouseButton1Down:Connect(function() if getgenv().TeleportOnAttack then local t = getClosest(); if t and t.Character then LocalPlayer.Character.HumanoidRootPart.CFrame = t.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, getgenv().StickDistance) end end end)
         end
         task.wait(1)
     end
@@ -501,64 +374,23 @@ end)
 
 RunService.RenderStepped:Connect(function()
     local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    local target = getClosest()
-    
-    local plrsDist = {}
+    local target = getClosest(); local plrsDist = {}
     if myRoot then
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
-                local d = (myRoot.Position - p.Character.HumanoidRootPart.Position).Magnitude
-                table.insert(plrsDist, {plr = p, dist = d})
-            end
-        end
+        for _, p in pairs(Players:GetPlayers()) do if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character.Humanoid.Health > 0 then table.insert(plrsDist, {plr = p, dist = (myRoot.Position - p.Character.HumanoidRootPart.Position).Magnitude}) end end
         table.sort(plrsDist, function(a,b) return a.dist < b.dist end)
     end
-    
-    local top5 = {}
-    for i=1, math.min(5, #plrsDist) do top5[plrsDist[i].plr] = true end
-
+    local top5 = {}; for i=1, math.min(5, #plrsDist) do top5[plrsDist[i].plr] = true end
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
-            local char = p.Character
-            
-            local hl = char:FindFirstChild("DW_Highlight") or Instance.new("Highlight", char)
-            hl.Name = "DW_Highlight"; hl.FillTransparency = 0.5
-            
-            if isWhitelisted(p) and getgenv().HighlightFriendly then 
-                hl.FillColor = Color3.new(0,1,0); hl.Enabled = true
-            elseif p == target and getgenv().HighlightEnemy then 
-                hl.FillColor = Color3.new(1,0,0); hl.Enabled = true
-            else 
-                hl.Enabled = false 
-            end
-            
-            local bbGui = char.HumanoidRootPart:FindFirstChild("DW_HealthESP")
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local hl = p.Character:FindFirstChild("DW_Highlight") or Instance.new("Highlight", p.Character); hl.Name = "DW_Highlight"; hl.FillTransparency = 0.5
+            if isWhitelisted(p) and getgenv().HighlightFriendly then hl.FillColor = Color3.new(0,1,0); hl.Enabled = true
+            elseif p == target and getgenv().HighlightEnemy then hl.FillColor = Color3.new(1,0,0); hl.Enabled = true
+            else hl.Enabled = false end
+            local bb = p.Character.HumanoidRootPart:FindFirstChild("DW_HealthESP")
             if getgenv().HealthESP and top5[p] then
-                if not bbGui then
-                    bbGui = Instance.new("BillboardGui", char.HumanoidRootPart)
-                    bbGui.Name = "DW_HealthESP"
-                    bbGui.Size = UDim2.new(0, 80, 0, 30)
-                    bbGui.StudsOffset = Vector3.new(2.5, -1.5, 0)
-                    bbGui.AlwaysOnTop = true
-                    
-                    local txt = Instance.new("TextLabel", bbGui)
-                    txt.Size = UDim2.new(1, 0, 1, 0)
-                    txt.BackgroundTransparency = 1
-                    txt.Font = Enum.Font.GothamBold
-                    txt.TextSize = 11
-                    txt.TextStrokeTransparency = 0
-                end
-                
-                local hp = math.floor(char.Humanoid.Health)
-                local maxHp = math.floor(char.Humanoid.MaxHealth)
-                bbGui.TextLabel.Text = hp .. " / " .. maxHp
-                
-                if hp > (maxHp * 0.6) then bbGui.TextLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-                elseif hp > (maxHp * 0.3) then bbGui.TextLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
-                else bbGui.TextLabel.TextColor3 = Color3.fromRGB(255, 0, 0) end
-            else
-                if bbGui then bbGui:Destroy() end
-            end
+                if not bb then bb = Instance.new("BillboardGui", p.Character.HumanoidRootPart); bb.Name = "DW_HealthESP"; bb.Size = UDim2.new(0, 80, 0, 30); bb.StudsOffset = Vector3.new(2.5, -1.5, 0); bb.AlwaysOnTop = true; local t = Instance.new("TextLabel", bb); t.Size = UDim2.new(1,0,1,0); t.BackgroundTransparency = 1; t.Font = "GothamBold"; t.TextSize = 11; t.TextStrokeTransparency = 0 end
+                local h = math.floor(p.Character.Humanoid.Health); local m = math.floor(p.Character.Humanoid.MaxHealth); bb.TextLabel.Text = h.." / "..m; bb.TextLabel.TextColor3 = h > (m*0.6) and Color3.new(0,1,0) or (h > (m*0.3) and Color3.new(1,1,0) or Color3.new(1,0,0))
+            elseif bb then bb:Destroy() end
         end
     end
 end)
