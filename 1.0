@@ -15,7 +15,8 @@ getgenv().CharAimLock = false
 getgenv().FloatingPanelVisible = false
 getgenv().SeparatedMode = false
 getgenv().RecordingMode = false
-getgenv().LockUI = false -- NOVA VARIÁVEL DE TRAVA
+getgenv().LockUI = false
+getgenv().SwipeMenu = false -- NOVA VAR DO GESTO
 getgenv().HighlightEnemy = true
 getgenv().HighlightFriendly = true
 
@@ -75,9 +76,7 @@ local function makeDraggable(guiObject, handle)
     local dragging, dragInput, dragStart, startPos
     local target = handle or guiObject
     target.InputBegan:Connect(function(input)
-        -- Trava de segurança (se LockUI ou RecordingMode estiverem ativos, ignora o clique de arrastar)
         if getgenv().LockUI or getgenv().RecordingMode then return end
-        
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true; dragStart = input.Position; startPos = guiObject.Position
             input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
@@ -87,7 +86,6 @@ local function makeDraggable(guiObject, handle)
         if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
     end)
     RunService.RenderStepped:Connect(function()
-        -- Trava contínua para evitar bugs durante o arrasto
         if dragging and dragInput and not getgenv().LockUI and not getgenv().RecordingMode then
             local delta = dragInput.Position - dragStart
             guiObject.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
@@ -102,7 +100,6 @@ main.BackgroundColor3 = Color3.fromRGB(15, 15, 15); main.Visible = false; Instan
 local mainStroke = Instance.new("UIStroke", main); mainStroke.Thickness = 3
 makeDraggable(main)
 
--- BOTÃO DE ABRIR (FORÇADO A CÍRCULO PERFEITO)
 local openBtn = Instance.new("TextButton", gui)
 openBtn.Size = UDim2.new(0, 45, 0, 45); openBtn.Position = UDim2.new(1, -60, 0, 20)
 openBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20); openBtn.Text = "DW"; openBtn.TextColor3 = Color3.new(1,1,1); openBtn.TextScaled = true
@@ -110,19 +107,15 @@ Instance.new("UICorner", openBtn, {CornerRadius = UDim.new(1, 0)})
 Instance.new("UIAspectRatioConstraint", openBtn, {AspectRatio = 1})
 makeDraggable(openBtn)
 
--- LÓGICA DE ABRIR/FECHAR COM RESET DE POSIÇÃO
 openBtn.MouseButton1Click:Connect(function() 
     main.Visible = not main.Visible 
-    if main.Visible then
-        -- Volta pro centro certinho toda vez que abre
-        main.Position = UDim2.new(0.5, -140, 0.5, -220)
-    end
+    if main.Visible then main.Position = UDim2.new(0.5, -140, 0.5, -220) end
 end)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1, 0, 0, 35); title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.0"; title.Font = "GothamBlack"; title.TextScaled = true
 
---// 5 ABAS SETUP
+--// ABAS SETUP
 local tabHolder = Instance.new("Frame", main)
 tabHolder.Size = UDim2.new(1, -10, 0, 30); tabHolder.Position = UDim2.new(0, 5, 0, 40); tabHolder.BackgroundTransparency = 1
 
@@ -212,10 +205,7 @@ local function createFloatBtn(emoji, varName)
     Instance.new("UICorner", b, {CornerRadius = UDim.new(1, 0)})
     Instance.new("UIAspectRatioConstraint", b, {AspectRatio = 1})
     makeDraggable(b)
-    
-    table.insert(FloatingButtonsList, b)
-    b.Parent = floatPanel
-
+    table.insert(FloatingButtonsList, b); b.Parent = floatPanel
     b.MouseButton1Click:Connect(function() getgenv()[varName] = not getgenv()[varName] end)
 end
 
@@ -223,11 +213,8 @@ createFloatBtn("🤺", "AutoAttack"); createFloatBtn("⚡", "TeleportOnAttack");
 
 --// CONTEÚDO ABAS
 createToggle(tabs.Combat, "Mostrar Botões/Painel", "FloatingPanelVisible", function(state)
-    if getgenv().SeparatedMode then
-        for _, b in ipairs(FloatingButtonsList) do b.Visible = state end
-    else
-        floatPanel.Visible = state
-    end
+    if getgenv().SeparatedMode then for _, b in ipairs(FloatingButtonsList) do b.Visible = state end
+    else floatPanel.Visible = state end
 end)
 createToggle(tabs.Combat, "Auto Attack", "AutoAttack")
 createToggle(tabs.Combat, "Teleport no Ataque", "TeleportOnAttack")
@@ -243,22 +230,18 @@ createToggle(tabs.Player, "Pulo Infinito", "InfiniteJump")
 createToggle(tabs.Player, "Anti-Ragdoll", "AntiFling")
 
 -- Conteúdo Aba BYPASS
-createToggle(tabs.Bypass, "Travar Posições UI", "LockUI") -- NOVO BOTÃO DE TRAVA
+createToggle(tabs.Bypass, "Travar Posições UI", "LockUI")
 createToggle(tabs.Bypass, "Modo Gravação (Invisível)", "RecordingMode")
+createToggle(tabs.Bypass, "Abrir Menu Deslizando", "SwipeMenu") -- NOVO TOGGLE GESTO
 createToggle(tabs.Bypass, "Separar Botões", "SeparatedMode", function(state)
     local isVisible = getgenv().FloatingPanelVisible
     if state then
         floatPanel.Visible = false
         for i, b in ipairs(FloatingButtonsList) do
-            b.Parent = gui
-            b.Position = UDim2.new(0.5, -120 + (i*45), 0.85, 0)
-            b.Visible = isVisible
+            b.Parent = gui; b.Position = UDim2.new(0.5, -120 + (i*45), 0.85, 0); b.Visible = isVisible
         end
     else
-        for _, b in ipairs(FloatingButtonsList) do
-            b.Parent = floatPanel
-            b.Visible = true
-        end
+        for _, b in ipairs(FloatingButtonsList) do b.Parent = floatPanel; b.Visible = true end
         floatPanel.Visible = isVisible
     end
 end)
@@ -267,7 +250,7 @@ end)
 createToggle(tabs.Test, "Health ESP (5 Perto)", "HealthESP")
 createToggle(tabs.Test, "Meu HP na Tela", "MyHealth")
 
---// ABA WHITELIST (DINÂMICA)
+--// ABA WHITELIST
 task.spawn(function()
     while true do
         if tabs.Whitelist.Visible then
@@ -286,6 +269,32 @@ task.spawn(function()
         end
         task.wait(3)
     end
+end)
+
+--// SISTEMA DE GESTO (SWIPE DOWN) PARA ABRIR O MENU
+local touchStart = nil
+UserInputService.TouchStarted:Connect(function(touch, gameProcessed)
+    if gameProcessed then return end
+    touchStart = touch.Position
+end)
+
+UserInputService.TouchEnded:Connect(function(touch, gameProcessed)
+    if not getgenv().SwipeMenu or not touchStart then return end
+    
+    local drop = touch.Position - touchStart
+    local screen = workspace.CurrentCamera.ViewportSize
+    
+    -- Verifica se o dedo desceu mais de 80 pixels e não foi pro lado
+    if drop.Y > 80 and math.abs(drop.X) < 60 then
+        -- Verifica se o movimento começou no TOPO (Top 30%) e no CENTRO (entre 30% e 70% da largura)
+        if touchStart.Y < (screen.Y * 0.3) and touchStart.X > (screen.X * 0.3) and touchStart.X < (screen.X * 0.7) then
+            main.Visible = not main.Visible
+            if main.Visible then
+                main.Position = UDim2.new(0.5, -140, 0.5, -220)
+            end
+        end
+    end
+    touchStart = nil
 end)
 
 --// LOOPS PRINCIPAIS E FÍSICA
@@ -309,7 +318,6 @@ RunService.Stepped:Connect(function()
             btn.BackgroundColor3 = getgenv()[btn.Name] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
         end
     end
-    -- Sincroniza cor interna pro sistema ler (GAMBIARRA LIMPA)
     FloatingButtonsList[1].Name = "AutoAttack"
     FloatingButtonsList[2].Name = "TeleportOnAttack"
     FloatingButtonsList[3].Name = "StickMode"
@@ -319,19 +327,16 @@ RunService.Stepped:Connect(function()
     local myHum = myChar and myChar:FindFirstChild("Humanoid")
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
     
-    -- Speed Force
     if myHum then myHum.WalkSpeed = getgenv().WalkSpeedValue end
 
     local target, dist = getClosest()
     local eRoot = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
 
-    -- Grudar Normal
     if getgenv().StickMode and myRoot and eRoot then
         local goal = eRoot.CFrame * CFrame.new(0, 0, getgenv().StickDistance)
         myRoot.CFrame = myRoot.CFrame:Lerp(goal, 1 - (getgenv().StickSmoothness/100))
     end
     
-    -- AIMBOT FÍSICO
     if getgenv().CharAimLock and myRoot and eRoot then
         local bg = myRoot:FindFirstChild("DW_AimGyro")
         if not bg then
@@ -349,7 +354,6 @@ RunService.Stepped:Connect(function()
         end
     end
     
-    -- Atualizador do Meu HP
     if getgenv().MyHealth and myHum then
         myHealthLbl.Visible = true
         local hp = math.floor(myHum.Health)
@@ -362,7 +366,6 @@ RunService.Stepped:Connect(function()
         myHealthLbl.Visible = false
     end
     
-    -- Anti Ragdoll
     if getgenv().AntiFling and myHum then
         myHum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
         myHum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
@@ -370,14 +373,12 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Pulo Infinito
 UserInputService.JumpRequest:Connect(function()
     if getgenv().InfiniteJump and LocalPlayer.Character:FindFirstChild("Humanoid") then
         LocalPlayer.Character.Humanoid:ChangeState("Jumping")
     end
 end)
 
--- Auto Attack
 task.spawn(function()
     while true do
         if getgenv().AutoAttack then
@@ -395,7 +396,6 @@ task.spawn(function()
     end
 end)
 
--- Teleport no Ataque
 task.spawn(function()
     while true do
         local btn = LocalPlayer.PlayerGui:FindFirstChild("ATK", true)
@@ -414,7 +414,6 @@ task.spawn(function()
     end
 end)
 
--- Highlights & Health ESP (Top 5)
 RunService.RenderStepped:Connect(function()
     local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     local target = getClosest()
@@ -437,7 +436,6 @@ RunService.RenderStepped:Connect(function()
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
             local char = p.Character
             
-            -- Toggles de Highlight Global
             local hl = char:FindFirstChild("DW_Highlight") or Instance.new("Highlight", char)
             hl.Name = "DW_Highlight"; hl.FillTransparency = 0.5
             
@@ -449,7 +447,6 @@ RunService.RenderStepped:Connect(function()
                 hl.Enabled = false 
             end
             
-            -- Lógica do Health ESP
             local bbGui = char.HumanoidRootPart:FindFirstChild("DW_HealthESP")
             if getgenv().HealthESP and top5[p] then
                 if not bbGui then
