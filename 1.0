@@ -14,16 +14,15 @@ getgenv().CharAimLock = false
 -- Ajustes e Visual
 getgenv().RecordingMode = false
 getgenv().LockUI = false
-getgenv().SwipeMenu = true -- Padrão ativado
 getgenv().HighlightEnemy = true
 getgenv().HighlightFriendly = true
 
+-- Gestos
+getgenv().LeftSwipeBind = "AutoAttack"
+getgenv().RightSwipeBind = "CharAimLock"
+
 -- Vars da Aba UI
 getgenv().ShowOldPanel = false
-getgenv().UIFloatAtk = false
-getgenv().UIFloatAim = false
-getgenv().UIFloatTp = false
-getgenv().UIFloatStick = false
 
 getgenv().StickDistance = 3
 getgenv().StickSmoothness = 0
@@ -37,7 +36,7 @@ getgenv().MyHealth = false
 local whitelist = {}
 local attackRange = 15
 local ActiveFloatingButtons = {}
-local MenuToggles = {} -- Para sincronizar perfeitamente
+local MenuToggles = {}
 
 --// REMOVE ANTIGO
 if CoreGui:FindFirstChild("DuelWarriorsUI") then CoreGui.DuelWarriorsUI:Destroy() end
@@ -99,39 +98,45 @@ local function makeDraggable(guiObject, handle)
     end)
 end
 
---// MENU PRINCIPAL (TAMANHO COMPACTO)
+--// MENU PRINCIPAL
 local main = Instance.new("Frame", gui)
 main.Size = UDim2.new(0, 280, 0, 320); main.Position = UDim2.new(0.5, -140, 0.5, -160)
 main.BackgroundColor3 = Color3.fromRGB(15, 15, 15); main.Visible = false; Instance.new("UICorner", main)
 local mainStroke = Instance.new("UIStroke", main); mainStroke.Thickness = 3
 makeDraggable(main)
 
--- BOTÃO X (FECHAR MENU)
+-- BOTÃO X (Ajustado)
 local closeMenuBtn = Instance.new("TextButton", main)
-closeMenuBtn.Size = UDim2.new(0, 30, 0, 30); closeMenuBtn.Position = UDim2.new(1, -35, 0, 5)
+closeMenuBtn.Size = UDim2.new(0, 30, 0, 30); closeMenuBtn.Position = UDim2.new(1, -30, 0, 2)
 closeMenuBtn.BackgroundTransparency = 1; closeMenuBtn.Text = "X"; closeMenuBtn.TextColor3 = Color3.new(1, 0, 0)
 closeMenuBtn.Font = Enum.Font.GothamBlack; closeMenuBtn.TextSize = 18
 closeMenuBtn.MouseButton1Click:Connect(function() main.Visible = false end)
 
--- BOTÃO DE ABRIR PADRÃO (CÍRCULO PERFEITO)
+-- TÍTULO (Ajustado para não tampar o X)
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1, -40, 0, 35); title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.0"; title.Font = "GothamBlack"
+title.TextScaled = true; title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- BOTÃO DE ABRIR PADRÃO
 local openBtn = Instance.new("TextButton", gui)
 openBtn.Size = UDim2.new(0, 45, 0, 45); openBtn.Position = UDim2.new(1, -60, 0, 20)
 openBtn.BackgroundColor3 = Color3.fromRGB(20, 20, 20); openBtn.Text = "DW"; openBtn.TextColor3 = Color3.new(1,1,1); openBtn.TextScaled = true
 Instance.new("UICorner", openBtn, {CornerRadius = UDim.new(1, 0)}) 
 Instance.new("UIAspectRatioConstraint", openBtn, {AspectRatio = 1})
 makeDraggable(openBtn)
-
 openBtn.MouseButton1Click:Connect(function() 
     main.Visible = not main.Visible 
     if main.Visible then main.Position = UDim2.new(0.5, -140, 0.5, -160) end
 end)
 
-local title = Instance.new("TextLabel", main)
-title.Size = UDim2.new(1, 0, 0, 35); title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.0"; title.Font = "GothamBlack"; title.TextScaled = true
-
---// ABAS SETUP
-local tabHolder = Instance.new("Frame", main)
-tabHolder.Size = UDim2.new(1, -10, 0, 30); tabHolder.Position = UDim2.new(0, 5, 0, 40); tabHolder.BackgroundTransparency = 1
+--// ABAS SETUP (COM SCROLL HORIZONTAL E NOMES COMPLETOS)
+local tabHolder = Instance.new("ScrollingFrame", main)
+tabHolder.Size = UDim2.new(1, -10, 0, 30); tabHolder.Position = UDim2.new(0, 5, 0, 40)
+tabHolder.BackgroundTransparency = 1; tabHolder.ScrollBarThickness = 0
+tabHolder.CanvasSize = UDim2.new(0, 430, 0, 0) -- Espaço para as abas rolarem pro lado
+local tabLayoutH = Instance.new("UIListLayout", tabHolder)
+tabLayoutH.FillDirection = Enum.FillDirection.Horizontal; tabLayoutH.Padding = UDim.new(0, 5)
 
 local tabs = {
     Combat = Instance.new("ScrollingFrame", main),
@@ -145,14 +150,20 @@ local tabs = {
 for _, t in pairs(tabs) do
     t.Size = UDim2.new(1, -20, 1, -85); t.Position = UDim2.new(0, 10, 0, 75)
     t.BackgroundTransparency = 1; t.ScrollBarThickness = 0; t.Visible = false
-    Instance.new("UIListLayout", t).Padding = UDim.new(0, 8)
+    
+    local layout = Instance.new("UIListLayout", t)
+    layout.Padding = UDim.new(0, 8)
+    -- Ajuste dinâmico do Scroll Vertical
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        t.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+    end)
 end
 tabs.Combat.Visible = true
 
-local function createTabBtn(text, pos, targetTab)
+local function createTabBtn(text, targetTab)
     local btn = Instance.new("TextButton", tabHolder)
-    btn.Size = UDim2.new(0.166, -2, 1, 0); btn.Position = pos; btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    btn.Text = text; btn.TextColor3 = Color3.new(1, 1, 1); btn.Font = "GothamBold"; btn.TextSize = 9; btn.TextScaled = true
+    btn.Size = UDim2.new(0, 65, 1, 0); btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    btn.Text = text; btn.TextColor3 = Color3.new(1, 1, 1); btn.Font = "GothamBold"; btn.TextSize = 10; btn.TextScaled = true
     Instance.new("UICorner", btn)
     btn.MouseButton1Click:Connect(function()
         for _, t in pairs(tabs) do t.Visible = false end
@@ -160,26 +171,35 @@ local function createTabBtn(text, pos, targetTab)
     end)
 end
 
-createTabBtn("Comb", UDim2.new(0, 0, 0, 0), tabs.Combat)
-createTabBtn("UI", UDim2.new(0.166, 0, 0, 0), tabs.UI)
-createTabBtn("Player", UDim2.new(0.332, 0, 0, 0), tabs.Player)
-createTabBtn("WList", UDim2.new(0.498, 0, 0, 0), tabs.Whitelist)
-createTabBtn("Bypass", UDim2.new(0.664, 0, 0, 0), tabs.Bypass)
-createTabBtn("Teste", UDim2.new(0.83, 0, 0, 0), tabs.Test)
+createTabBtn("Combate", tabs.Combat)
+createTabBtn("UI", tabs.UI)
+createTabBtn("Player", tabs.Player)
+createTabBtn("Whitelist", tabs.Whitelist)
+createTabBtn("Bypass", tabs.Bypass)
+createTabBtn("Teste", tabs.Test)
 
 --// CONSTRUTORES DE UI
 local function createToggle(parent, text, varName, callback)
     local btn = Instance.new("TextButton", parent)
     btn.Size = UDim2.new(1, -5, 0, 38); btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    btn.Text = text .. " [OFF]"; btn.TextColor3 = Color3.new(1,1,1); btn.Font = "GothamBold"
-    Instance.new("UICorner", btn)
     
-    -- Registra o botão para sincronização automática
+    local isGlobal = getgenv()[varName] ~= nil
+    local currentState = isGlobal and getgenv()[varName] or false
+    
+    btn.Text = text .. (currentState and " [ON]" or " [OFF]"); btn.TextColor3 = Color3.new(1,1,1); btn.Font = "GothamBold"
+    Instance.new("UICorner", btn)
+    if currentState then btn.BackgroundColor3 = Color3.fromRGB(0, 150, 0) end
+
     MenuToggles[varName] = {Btn = btn, Text = text}
 
     btn.MouseButton1Click:Connect(function()
-        getgenv()[varName] = not getgenv()[varName]
-        if callback then callback(getgenv()[varName]) end
+        if isGlobal then getgenv()[varName] = not getgenv()[varName] end
+        local newState = isGlobal and getgenv()[varName] or not currentState
+        if not isGlobal then currentState = newState end
+        
+        btn.Text = text .. (newState and " [ON]" or " [OFF]")
+        btn.BackgroundColor3 = newState and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
+        if callback then callback(newState, btn) end
     end)
 end
 
@@ -203,7 +223,27 @@ local function createSlider(parent, text, min, max, default, varName)
     end)
 end
 
---// SISTEMA DO PAINEL ANTIGO (DOCK)
+local function createBindCycler(parent, title, varToChange)
+    local options = {"AutoAttack", "CharAimLock", "TeleportOnAttack", "StickMode"}
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = UDim2.new(1, -5, 0, 38); btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.TextColor3 = Color3.new(1,1,1); btn.Font = "GothamBold"
+    Instance.new("UICorner", btn)
+
+    local function getIndex()
+        for i, v in ipairs(options) do if v == getgenv()[varToChange] then return i end end return 1
+    end
+    
+    btn.Text = title .. ": " .. options[getIndex()]
+    btn.MouseButton1Click:Connect(function()
+        local nextId = getIndex() + 1
+        if nextId > #options then nextId = 1 end
+        getgenv()[varToChange] = options[nextId]
+        btn.Text = title .. ": " .. options[nextId]
+    end)
+end
+
+--// PAINEL ANTIGO (DOCK)
 local oldPanel = Instance.new("Frame", gui); oldPanel.Name = "OldPanel"
 oldPanel.Size = UDim2.new(0, 180, 0, 40); oldPanel.Position = UDim2.new(0.5, -90, 0.85, 0)
 oldPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 20); oldPanel.Visible = false; Instance.new("UICorner", oldPanel, {CornerRadius = UDim.new(1,0)})
@@ -226,38 +266,24 @@ local function createOldPanelBtn(emoji, varName)
 end
 createOldPanelBtn("🤺", "AutoAttack"); createOldPanelBtn("⚡", "TeleportOnAttack"); createOldPanelBtn("⚔️", "StickMode"); createOldPanelBtn("👁️", "CharAimLock")
 
---// SISTEMA DE BOTÕES FLUTUANTES INDIVIDUAIS
-local function spawnFloatingBtn(emoji, varName, toggleVar)
+--// BOTÕES FLUTUANTES INDIVIDUAIS
+local function spawnFloatingBtn(emoji, varName)
     if ActiveFloatingButtons[varName] then return end 
-    
     local frame = Instance.new("Frame", gui)
-    frame.Size = UDim2.new(0, 32, 0, 32) -- Tamanho menor
-    frame.Position = UDim2.new(0.5, math.random(-80, 80), 0.5, math.random(-80, 80))
-    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-    Instance.new("UICorner", frame, {CornerRadius = UDim.new(1, 0)})
+    frame.Size = UDim2.new(0, 32, 0, 32); frame.Position = UDim2.new(0.5, math.random(-80, 80), 0.5, math.random(-80, 80))
+    frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20); Instance.new("UICorner", frame, {CornerRadius = UDim.new(1, 0)})
     Instance.new("UIAspectRatioConstraint", frame, {AspectRatio = 1})
-    
     local btn = Instance.new("TextButton", frame)
     btn.Size = UDim2.new(1, 0, 1, 0); btn.BackgroundTransparency = 1; btn.Text = emoji; btn.TextScaled = true
     Instance.new("UICorner", btn, {CornerRadius = UDim.new(1, 0)})
-    
-    makeDraggable(frame, btn) -- Arrastável perfeitamente pelo botão
-    
+    makeDraggable(frame, btn)
     local xBtn = Instance.new("TextButton", frame)
     xBtn.Size = UDim2.new(0, 14, 0, 14); xBtn.Position = UDim2.new(1, -8, 0, -5)
     xBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0); xBtn.Text = "X"; xBtn.TextColor3 = Color3.new(1,1,1); xBtn.Font = Enum.Font.GothamBold; xBtn.TextScaled = true
     Instance.new("UICorner", xBtn, {CornerRadius = UDim.new(1, 0)})
     
-    btn.MouseButton1Click:Connect(function() 
-        getgenv()[varName] = not getgenv()[varName] 
-    end)
-    
-    xBtn.MouseButton1Click:Connect(function()
-        frame:Destroy()
-        ActiveFloatingButtons[varName] = nil
-        getgenv()[toggleVar] = false -- Desliga a opção na aba UI automaticamente
-    end)
-    
+    btn.MouseButton1Click:Connect(function() getgenv()[varName] = not getgenv()[varName] end)
+    xBtn.MouseButton1Click:Connect(function() frame:Destroy() ActiveFloatingButtons[varName] = nil end)
     ActiveFloatingButtons[varName] = {Frame = frame, Btn = btn}
 end
 
@@ -273,20 +299,15 @@ createToggle(tabs.Combat, "Highlight Inimigo", "HighlightEnemy")
 createSlider(tabs.Combat, "Distância Grudar", 0, 15, 3, "StickDistance")
 createSlider(tabs.Combat, "Suavidade", 0, 95, 0, "StickSmoothness")
 
--- ABA UI (GERENCIADOR DE BOTÕES)
-createToggle(tabs.UI, "Mostrar Painel Antigo", "ShowOldPanel", function(state) oldPanel.Visible = state end)
-createToggle(tabs.UI, "+ Auto Attack (🤺)", "UIFloatAtk", function(state)
-    if state then spawnFloatingBtn("🤺", "AutoAttack", "UIFloatAtk") else if ActiveFloatingButtons["AutoAttack"] then ActiveFloatingButtons["AutoAttack"].Frame:Destroy() ActiveFloatingButtons["AutoAttack"] = nil end end
-end)
-createToggle(tabs.UI, "+ Aimbot (👁️)", "UIFloatAim", function(state)
-    if state then spawnFloatingBtn("👁️", "CharAimLock", "UIFloatAim") else if ActiveFloatingButtons["CharAimLock"] then ActiveFloatingButtons["CharAimLock"].Frame:Destroy() ActiveFloatingButtons["CharAimLock"] = nil end end
-end)
-createToggle(tabs.UI, "+ Teleport (⚡)", "UIFloatTp", function(state)
-    if state then spawnFloatingBtn("⚡", "TeleportOnAttack", "UIFloatTp") else if ActiveFloatingButtons["TeleportOnAttack"] then ActiveFloatingButtons["TeleportOnAttack"].Frame:Destroy() ActiveFloatingButtons["TeleportOnAttack"] = nil end end
-end)
-createToggle(tabs.UI, "+ Grudar (⚔️)", "UIFloatStick", function(state)
-    if state then spawnFloatingBtn("⚔️", "StickMode", "UIFloatStick") else if ActiveFloatingButtons["StickMode"] then ActiveFloatingButtons["StickMode"].Frame:Destroy() ActiveFloatingButtons["StickMode"] = nil end end
-end)
+-- ABA UI (GESTOS, PAINÉIS E TRAVA)
+createToggle(tabs.UI, "Travar Posições UI", "LockUI")
+createBindCycler(tabs.UI, "Gesto Esquerdo", "LeftSwipeBind")
+createBindCycler(tabs.UI, "Gesto Direito", "RightSwipeBind")
+createToggle(tabs.UI, "Mostrar Painel Fixo", "ShowOldPanel", function(state) oldPanel.Visible = state end)
+createToggle(tabs.UI, "+ Float Auto Attack", "UI_f1", function(s) if s then spawnFloatingBtn("🤺", "AutoAttack") end end)
+createToggle(tabs.UI, "+ Float Aimbot", "UI_f2", function(s) if s then spawnFloatingBtn("👁️", "CharAimLock") end end)
+createToggle(tabs.UI, "+ Float Teleport", "UI_f3", function(s) if s then spawnFloatingBtn("⚡", "TeleportOnAttack") end end)
+createToggle(tabs.UI, "+ Float Grudar", "UI_f4", function(s) if s then spawnFloatingBtn("⚔️", "StickMode") end end)
 
 -- ABA PLAYER
 createSlider(tabs.Player, "Velocidade (Speed)", 16, 200, 16, "WalkSpeedValue")
@@ -296,11 +317,9 @@ createToggle(tabs.Player, "Health ESP (5 Perto)", "HealthESP")
 createToggle(tabs.Player, "Meu HP na Tela", "MyHealth")
 
 -- ABA BYPASS
-createToggle(tabs.Bypass, "Travar Posições UI", "LockUI")
 createToggle(tabs.Bypass, "Modo Gravação (Invisível)", "RecordingMode")
-createToggle(tabs.Bypass, "Abrir Menu Deslizando", "SwipeMenu")
 
--- ABA TESTE (Limpa por enquanto)
+-- ABA TESTE
 local testLbl = Instance.new("TextLabel", tabs.Test)
 testLbl.Size = UDim2.new(1, 0, 0, 30); testLbl.BackgroundTransparency = 1; testLbl.Text = "Aguardando novos testes..."; testLbl.TextColor3 = Color3.new(0.6, 0.6, 0.6); testLbl.Font = Enum.Font.Gotham
 
@@ -325,7 +344,7 @@ task.spawn(function()
     end
 end)
 
---// SISTEMA DE GESTO NATIVO (SWIPE)
+--// SISTEMA DE GESTO NATIVO (SWIPES)
 local touchStart = nil
 UserInputService.TouchStarted:Connect(function(touch, gameProcessed)
     if gameProcessed then return end
@@ -333,12 +352,22 @@ UserInputService.TouchStarted:Connect(function(touch, gameProcessed)
 end)
 
 UserInputService.TouchEnded:Connect(function(touch, gameProcessed)
-    if not getgenv().SwipeMenu or not touchStart then return end
+    if not touchStart then return end
     local drop = touch.Position - touchStart
     local screen = workspace.CurrentCamera.ViewportSize
     
-    if drop.Y > 80 and math.abs(drop.X) < 60 then
-        if touchStart.Y < (screen.Y * 0.3) and touchStart.X > (screen.X * 0.3) and touchStart.X < (screen.X * 0.7) then
+    -- Verifica se deslizou mais de 80px pra baixo a partir do terço superior da tela
+    if drop.Y > 80 and math.abs(drop.X) < 60 and touchStart.Y < (screen.Y * 0.3) then
+        if touchStart.X < (screen.X * 0.33) then
+            -- Gesto Esquerdo (33% da esquerda)
+            local bind = getgenv().LeftSwipeBind
+            getgenv()[bind] = not getgenv()[bind]
+        elseif touchStart.X > (screen.X * 0.66) then
+            -- Gesto Direito (33% da direita)
+            local bind = getgenv().RightSwipeBind
+            getgenv()[bind] = not getgenv()[bind]
+        else
+            -- Gesto Centro (Abre/Fecha o menu)
             main.Visible = not main.Visible
             if main.Visible then main.Position = UDim2.new(0.5, -140, 0.5, -160) end
         end
@@ -348,14 +377,12 @@ end)
 
 --// LOOPS PRINCIPAIS E FÍSICA
 RunService.Stepped:Connect(function()
-    -- Sincronizador Global de Toggles (Impede o Bug de "não conseguir desativar")
     for varName, data in pairs(MenuToggles) do
         local state = getgenv()[varName]
         data.Btn.Text = data.Text .. (state and " [ON]" or " [OFF]")
         data.Btn.BackgroundColor3 = state and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30)
     end
 
-    -- RGB e Bypass Invisível
     local rgb = Color3.fromHSV(tick() % 5 / 5, 1, 1)
     title.TextColor3 = rgb; mainStroke.Color = rgb; oldStroke.Color = rgb
     
@@ -367,22 +394,18 @@ RunService.Stepped:Connect(function()
     moveHandle.BackgroundTransparency = isRec and 1 or 0
     moveHandle.TextTransparency = isRec and 1 or 0
     
-    -- Sincroniza cores do Painel Antigo
     for _, data in pairs(OldPanelBtns) do
         data.Btn.BackgroundTransparency = isRec and 1 or 0
         data.Btn.TextTransparency = isRec and 1 or 0
         if not isRec then data.Btn.BackgroundColor3 = getgenv()[data.Var] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30) end
     end
     
-    -- Sincroniza cores e X dos Botões Individuais
     for varName, data in pairs(ActiveFloatingButtons) do
         data.Frame.BackgroundTransparency = isRec and 1 or 0
         data.Btn.TextTransparency = isRec and 1 or 0
         local xBtn = data.Frame:FindFirstChildOfClass("TextButton")
         if xBtn then xBtn.Visible = not isRec end
-        if not isRec then
-            data.Frame.BackgroundColor3 = getgenv()[varName] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(20, 20, 20)
-        end
+        if not isRec then data.Frame.BackgroundColor3 = getgenv()[varName] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(20, 20, 20) end
     end
 
     local myChar = LocalPlayer.Character
