@@ -14,12 +14,16 @@ getgenv().CharAimLock = false
 -- Ajustes e Visual
 getgenv().RecordingMode = false
 getgenv().LockUI = false
+getgenv().SwipeMenu = true
 getgenv().HighlightEnemy = true
 getgenv().HighlightFriendly = true
 
 -- Gestos
 getgenv().LeftSwipeBind = "AutoAttack"
 getgenv().RightSwipeBind = "CharAimLock"
+
+-- Vars da Aba UI
+getgenv().ShowOldPanel = false
 
 getgenv().StickDistance = 3
 getgenv().StickSmoothness = 0
@@ -76,6 +80,7 @@ myHealthLbl.TextSize = 14; myHealthLbl.TextXAlignment = Enum.TextXAlignment.Righ
 local function makeDraggable(guiObject, handle)
     local dragging, dragInput, dragStart, startPos
     local target = handle or guiObject
+    
     target.InputBegan:Connect(function(input)
         if getgenv().LockUI or getgenv().RecordingMode then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -252,6 +257,8 @@ local function spawnFloatingBtn(emoji, varName)
 end
 
 --// CONTEÚDO ABAS
+
+-- ABA COMBATE
 createToggle(tabs.Combat, "Auto Attack", "AutoAttack")
 createToggle(tabs.Combat, "Teleport no Ataque", "TeleportOnAttack")
 createToggle(tabs.Combat, "Grudar no Alvo", "StickMode")
@@ -278,19 +285,17 @@ createToggle(tabs.Player, "Meu HP na Tela", "MyHealth")
 
 createToggle(tabs.Bypass, "Modo Gravação (Invisível)", "RecordingMode")
 
+-- ABA TESTE
+local testLbl = Instance.new("TextLabel", tabs.Test)
+testLbl.Size = UDim2.new(1, 0, 0, 30); testLbl.BackgroundTransparency = 1; testLbl.Text = "Aguardando novos testes..."; testLbl.TextColor3 = Color3.new(0.6, 0.6, 0.6); testLbl.Font = Enum.Font.Gotham
+
 --// ABA WHITELIST (ORDEM ALFABÉTICA A-Z)
 task.spawn(function()
     while true do
         if tabs.Whitelist.Visible then
             local currentPlayers = Players:GetPlayers()
-            
-            -- Ordena a tabela de jogadores por DisplayName (ou Name) em ordem alfabética
-            table.sort(currentPlayers, function(a, b)
-                return a.DisplayName:lower() < b.DisplayName:lower()
-            end)
-
+            table.sort(currentPlayers, function(a, b) return a.DisplayName:lower() < b.DisplayName:lower() end)
             for _, v in pairs(tabs.Whitelist:GetChildren()) do if v:IsA("TextButton") then v:Destroy() end end
-            
             for _, p in pairs(currentPlayers) do
                 if p ~= LocalPlayer then
                     local b = Instance.new("TextButton", tabs.Whitelist); b.Size = UDim2.new(1, 0, 0, 30)
@@ -321,7 +326,7 @@ UserInputService.TouchEnded:Connect(function(touch, gameProcessed)
     touchStart = nil
 end)
 
---// LOOPS PRINCIPAIS
+--// LOOPS PRINCIPAIS E FÍSICA
 RunService.Stepped:Connect(function()
     for varName, data in pairs(MenuToggles) do
         local state = getgenv()[varName]
@@ -337,15 +342,34 @@ RunService.Stepped:Connect(function()
     oldPanel.BackgroundTransparency = isRec and 1 or 0; oldStroke.Transparency = isRec and 1 or 0; moveHandle.Visible = not isRec
     for _, data in pairs(OldPanelBtns) do data.Btn.BackgroundTransparency = isRec and 1 or 0; data.Btn.TextTransparency = isRec and 1 or 0; if not isRec then data.Btn.BackgroundColor3 = getgenv()[data.Var] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30) end end
     for varName, data in pairs(ActiveFloatingButtons) do data.Frame.BackgroundTransparency = isRec and 1 or 0; data.Btn.TextTransparency = isRec and 1 or 0; local x = data.Frame:FindFirstChildOfClass("TextButton"); if x then x.Visible = not isRec end; if not isRec then data.Frame.BackgroundColor3 = getgenv()[varName] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(20, 20, 20) end end
+    
     local char = LocalPlayer.Character; local hum = char and char:FindFirstChild("Humanoid")
     local root = char and char:FindFirstChild("HumanoidRootPart")
+    
     if hum then hum.WalkSpeed = getgenv().WalkSpeedValue end
     local target, dist = getClosest(); local eRoot = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+    
     if getgenv().StickMode and root and eRoot then root.CFrame = root.CFrame:Lerp(eRoot.CFrame * CFrame.new(0, 0, getgenv().StickDistance), 1 - (getgenv().StickSmoothness/100)) end
-    if getgenv().CharAimLock and root and eRoot then
-        local bg = root:FindFirstChild("DW_AimGyro") or Instance.new("BodyGyro", root); bg.Name = "DW_AimGyro"; bg.MaxTorque = Vector3.new(0, math.huge, 0); bg.P = 500000
+    
+    -- AIMBOT COM TRAVA DE FÍSICA PARA NÃO CAPOTAR
+    if getgenv().CharAimLock and root and eRoot and hum then
+        hum.AutoRotate = false -- Desliga a rotação original do jogo para não brigar com o Aimbot
+        local bg = root:FindFirstChild("DW_AimGyro")
+        if not bg then
+            bg = Instance.new("BodyGyro")
+            bg.Name = "DW_AimGyro"
+            -- TRAVA TODOS OS EIXOS NO MÁXIMO PARA NÃO DAR MORTAL
+            bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge) 
+            bg.P = 500000
+            bg.D = 500 -- Amortecimento pra não tremer no impacto
+            bg.Parent = root
+        end
         bg.CFrame = CFrame.lookAt(root.Position, Vector3.new(eRoot.Position.X, root.Position.Y, eRoot.Position.Z))
-    elseif root and root:FindFirstChild("DW_AimGyro") then root.DW_AimGyro:Destroy() end
+    else
+        if hum then hum.AutoRotate = true end
+        if root and root:FindFirstChild("DW_AimGyro") then root.DW_AimGyro:Destroy() end
+    end
+    
     if getgenv().MyHealth and hum then myHealthLbl.Visible = true; myHealthLbl.Text = "MEU HP: "..math.floor(hum.Health).." / "..math.floor(hum.MaxHealth); myHealthLbl.TextColor3 = hum.Health > (hum.MaxHealth*0.6) and Color3.new(0,1,0) or (hum.Health > (hum.MaxHealth*0.3) and Color3.new(1,1,0) or Color3.new(1,0,0)) else myHealthLbl.Visible = false end
     if getgenv().AntiFling and hum then hum:SetStateEnabled(10, false); hum:SetStateEnabled(1, false); if hum:GetState() == Enum.HumanoidStateType.Ragdoll then hum:ChangeState(Enum.HumanoidStateType.GettingUp) end end
 end)
