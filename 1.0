@@ -39,6 +39,10 @@ local attackRange = 15
 local ActiveFloatingButtons = {}
 local MenuToggles = {}
 
+-- Sensores Legit (Aimbot)
+local lastHp = 100
+local stunTime = 0
+
 --// REMOVE ANTIGO
 if CoreGui:FindFirstChild("DuelWarriorsUI") then CoreGui.DuelWarriorsUI:Destroy() end
 
@@ -80,7 +84,6 @@ myHealthLbl.TextSize = 14; myHealthLbl.TextXAlignment = Enum.TextXAlignment.Righ
 local function makeDraggable(guiObject, handle)
     local dragging, dragInput, dragStart, startPos
     local target = handle or guiObject
-    
     target.InputBegan:Connect(function(input)
         if getgenv().LockUI or getgenv().RecordingMode then return end
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -262,7 +265,7 @@ end
 createToggle(tabs.Combat, "Auto Attack", "AutoAttack")
 createToggle(tabs.Combat, "Teleport no Ataque", "TeleportOnAttack")
 createToggle(tabs.Combat, "Grudar no Alvo", "StickMode")
-createToggle(tabs.Combat, "Aimbot (Olhar Inimigo)", "CharAimLock")
+createToggle(tabs.Combat, "Aimbot (Legit)", "CharAimLock")
 createToggle(tabs.Combat, "Highlight Aliado", "HighlightFriendly")
 createToggle(tabs.Combat, "Highlight Inimigo", "HighlightEnemy")
 createSlider(tabs.Combat, "Distância Grudar", 0, 15, 3, "StickDistance")
@@ -289,7 +292,7 @@ createToggle(tabs.Bypass, "Modo Gravação (Invisível)", "RecordingMode")
 local testLbl = Instance.new("TextLabel", tabs.Test)
 testLbl.Size = UDim2.new(1, 0, 0, 30); testLbl.BackgroundTransparency = 1; testLbl.Text = "Aguardando novos testes..."; testLbl.TextColor3 = Color3.new(0.6, 0.6, 0.6); testLbl.Font = Enum.Font.Gotham
 
---// ABA WHITELIST (ORDEM ALFABÉTICA A-Z)
+--// ABA WHITELIST (ORDEM ALFABÉTICA)
 task.spawn(function()
     while true do
         if tabs.Whitelist.Visible then
@@ -312,7 +315,7 @@ task.spawn(function()
     end
 end)
 
---// SISTEMA DE GESTO NATIVO
+--// SISTEMA DE GESTO NATIVO (SWIPES)
 local touchStart = nil
 UserInputService.TouchStarted:Connect(function(touch, gameProcessed) if not gameProcessed then touchStart = touch.Position end end)
 UserInputService.TouchEnded:Connect(function(touch, gameProcessed)
@@ -351,17 +354,32 @@ RunService.Stepped:Connect(function()
     
     if getgenv().StickMode and root and eRoot then root.CFrame = root.CFrame:Lerp(eRoot.CFrame * CFrame.new(0, 0, getgenv().StickDistance), 1 - (getgenv().StickSmoothness/100)) end
     
-    -- AIMBOT COM TRAVA DE FÍSICA PARA NÃO CAPOTAR
-    if getgenv().CharAimLock and root and eRoot and hum then
-        hum.AutoRotate = false -- Desliga a rotação original do jogo para não brigar com o Aimbot
+    -- SENSOR LEGIT DE DANO PARA AIMBOT
+    local isStunned = false
+    if hum then
+        if lastHp == 0 or hum.Health >= lastHp then
+            lastHp = hum.Health
+        elseif hum.Health < lastHp then
+            stunTime = tick() + 0.8 -- Desliga o Aimbot por 0.8s ao tomar dano
+            lastHp = hum.Health
+        end
+        local state = hum:GetState()
+        if state == Enum.HumanoidStateType.Ragdoll or state == Enum.HumanoidStateType.FallingDown then
+            isStunned = true
+        end
+    end
+    if tick() < stunTime then isStunned = true end
+
+    -- AIMBOT COM INTERRUPTOR DE IMPACTO
+    if getgenv().CharAimLock and root and eRoot and hum and not isStunned then
+        hum.AutoRotate = false 
         local bg = root:FindFirstChild("DW_AimGyro")
         if not bg then
             bg = Instance.new("BodyGyro")
             bg.Name = "DW_AimGyro"
-            -- TRAVA TODOS OS EIXOS NO MÁXIMO PARA NÃO DAR MORTAL
             bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge) 
             bg.P = 500000
-            bg.D = 500 -- Amortecimento pra não tremer no impacto
+            bg.D = 500
             bg.Parent = root
         end
         bg.CFrame = CFrame.lookAt(root.Position, Vector3.new(eRoot.Position.X, root.Position.Y, eRoot.Position.Z))
