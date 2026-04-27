@@ -30,8 +30,11 @@ getgenv().AntiFling = false
 getgenv().HealthESP = false
 getgenv().MyHealth = false
 
+-- Novos Alcances
+getgenv().AttackRange = 15
+getgenv().AimbotRange = 500
+
 local whitelist = {}
-local attackRange = 15
 local ActiveFloatingButtons = {}
 local MenuToggles = {}
 
@@ -217,6 +220,50 @@ local function createBindCycler(parent, title, varToChange)
     end)
 end
 
+local function createStepper(parent, text, varName, step)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(1, -5, 0, 45)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    Instance.new("UICorner", frame)
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(1, -80, 1, 0)
+    lbl.Position = UDim2.new(0, 10, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text .. ": " .. getgenv()[varName]
+    lbl.TextColor3 = Color3.new(1, 1, 1)
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local minusBtn = Instance.new("TextButton", frame)
+    minusBtn.Size = UDim2.new(0, 30, 0, 30)
+    minusBtn.Position = UDim2.new(1, -75, 0.5, -15)
+    minusBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    minusBtn.Text = "-"
+    minusBtn.TextColor3 = Color3.new(1, 1, 1)
+    minusBtn.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", minusBtn)
+
+    local plusBtn = Instance.new("TextButton", frame)
+    plusBtn.Size = UDim2.new(0, 30, 0, 30)
+    plusBtn.Position = UDim2.new(1, -35, 0.5, -15)
+    plusBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    plusBtn.Text = "+"
+    plusBtn.TextColor3 = Color3.new(1, 1, 1)
+    plusBtn.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", plusBtn)
+
+    minusBtn.MouseButton1Click:Connect(function()
+        getgenv()[varName] = math.max(0, getgenv()[varName] - step)
+        lbl.Text = text .. ": " .. getgenv()[varName]
+    end)
+
+    plusBtn.MouseButton1Click:Connect(function()
+        getgenv()[varName] = getgenv()[varName] + step
+        lbl.Text = text .. ": " .. getgenv()[varName]
+    end)
+end
+
 --// PAINEL ANTIGO E BOTÕES FLUTUANTES
 local oldPanel = Instance.new("Frame", gui); oldPanel.Name = "OldPanel"
 oldPanel.Size = UDim2.new(0, 180, 0, 40); oldPanel.Position = UDim2.new(0.5, -90, 0.85, 0)
@@ -277,6 +324,9 @@ createToggle(tabs.Player, "Health ESP (5 Perto)", "HealthESP")
 createToggle(tabs.Player, "Meu HP na Tela", "MyHealth")
 
 createToggle(tabs.Bypass, "Modo Gravação (Invisível)", "RecordingMode")
+
+createStepper(tabs.Test, "Alcance Auto Attack", "AttackRange", 1)
+createSlider(tabs.Test, "Alcance Aimbot", 10, 1000, 500, "AimbotRange")
 
 --// ABA WHITELIST (ORDEM ALFABÉTICA A-Z)
 task.spawn(function()
@@ -342,10 +392,13 @@ RunService.Stepped:Connect(function()
     if hum then hum.WalkSpeed = getgenv().WalkSpeedValue end
     local target, dist = getClosest(); local eRoot = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
     if getgenv().StickMode and root and eRoot then root.CFrame = root.CFrame:Lerp(eRoot.CFrame * CFrame.new(0, 0, getgenv().StickDistance), 1 - (getgenv().StickSmoothness/100)) end
-    if getgenv().CharAimLock and root and eRoot then
+    
+    -- Verificação de distância do Aimbot alterada aqui
+    if getgenv().CharAimLock and root and eRoot and dist <= getgenv().AimbotRange then
         local bg = root:FindFirstChild("DW_AimGyro") or Instance.new("BodyGyro", root); bg.Name = "DW_AimGyro"; bg.MaxTorque = Vector3.new(0, math.huge, 0); bg.P = 500000
         bg.CFrame = CFrame.lookAt(root.Position, Vector3.new(eRoot.Position.X, root.Position.Y, eRoot.Position.Z))
     elseif root and root:FindFirstChild("DW_AimGyro") then root.DW_AimGyro:Destroy() end
+    
     if getgenv().MyHealth and hum then myHealthLbl.Visible = true; myHealthLbl.Text = "MEU HP: "..math.floor(hum.Health).." / "..math.floor(hum.MaxHealth); myHealthLbl.TextColor3 = hum.Health > (hum.MaxHealth*0.6) and Color3.new(0,1,0) or (hum.Health > (hum.MaxHealth*0.3) and Color3.new(1,1,0) or Color3.new(1,0,0)) else myHealthLbl.Visible = false end
     if getgenv().AntiFling and hum then hum:SetStateEnabled(10, false); hum:SetStateEnabled(1, false); if hum:GetState() == Enum.HumanoidStateType.Ragdoll then hum:ChangeState(Enum.HumanoidStateType.GettingUp) end end
 end)
@@ -355,7 +408,11 @@ UserInputService.JumpRequest:Connect(function() if getgenv().InfiniteJump and Lo
 task.spawn(function()
     while true do
         if getgenv().AutoAttack then
-            local t, d = getClosest(); if t and d <= attackRange then local r = getRemote(); if r then r:FireServer({Key = "TouchATK", State = Enum.UserInputState.Begin}); task.wait(0.05); r:FireServer({Key = "TouchATK", State = Enum.UserInputState.End}) end end
+            local t, d = getClosest()
+            -- Verificação de distância do AutoAttack alterada aqui
+            if t and d <= getgenv().AttackRange then 
+                local r = getRemote(); if r then r:FireServer({Key = "TouchATK", State = Enum.UserInputState.Begin}); task.wait(0.05); r:FireServer({Key = "TouchATK", State = Enum.UserInputState.End}) end 
+            end
         end
         task.wait(0.1)
     end
