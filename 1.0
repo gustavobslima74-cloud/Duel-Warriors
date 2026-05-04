@@ -8,7 +8,7 @@ local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
 --// VARS GLOBAIS DE COMBATE
-getgenv().AutoAttack = false
+getgenv().AutoAttack = true -- AGORA INICIA ATIVADO
 getgenv().StickMode = false
 getgenv().TeleportOnAttack = false
 getgenv().CharAimLock = false
@@ -43,7 +43,7 @@ if CoreGui:FindFirstChild("DuelWarriorsUI") then CoreGui.DuelWarriorsUI:Destroy(
 task.spawn(function()
     StarterGui:SetCore("SendNotification", {
         Title = "Duel Warriors",
-        Text = "Script v1.3 (Fix v1) carregado!",
+        Text = "Script v1.4 carregado!",
         Duration = 5
     })
     
@@ -159,7 +159,7 @@ closeMenuBtn.MouseButton1Click:Connect(toggleMenu)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1, -40, 0, 35); title.Position = UDim2.new(0, 10, 0, 0)
-title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.3"; title.Font = "GothamBlack"
+title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.4"; title.Font = "GothamBlack"
 title.TextScaled = true; title.TextXAlignment = Enum.TextXAlignment.Left
 
 --// ABAS SETUP
@@ -282,7 +282,6 @@ end
 
 -- Novo Sistema de Dropdown (Pasta)
 local function createDropdownFolder(parent, text)
-    -- Container principal invisível que segura o Botão e o Conteúdo
     local container = Instance.new("Frame", parent)
     container.Size = UDim2.new(1, -5, 0, 0)
     container.AutomaticSize = Enum.AutomaticSize.Y
@@ -292,17 +291,19 @@ local function createDropdownFolder(parent, text)
     containerLayout.SortOrder = Enum.SortOrder.LayoutOrder
     containerLayout.Padding = UDim.new(0, 5)
 
+    local isOpen = false -- AGORA INICIA FECHADA
+
     local folderBtn = Instance.new("TextButton", container)
     folderBtn.Size = UDim2.new(1, 0, 0, 35)
     folderBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    folderBtn.Text = "▼ " .. text
+    folderBtn.Text = "▶ " .. text -- SETA INDICANDO FECHADO
     folderBtn.TextColor3 = Color3.new(1, 1, 1)
     folderBtn.Font = Enum.Font.GothamBlack
     Instance.new("UICorner", folderBtn)
     applyClickAnimation(folderBtn)
 
     local contentFrame = Instance.new("Frame", container)
-    contentFrame.Size = UDim2.new(1, 0, 0, 0)
+    contentFrame.Size = UDim2.new(1, 0, 0, 0) -- TAMANHO ZERO INICIAL
     contentFrame.BackgroundTransparency = 1
     contentFrame.ClipsDescendants = true
 
@@ -310,9 +311,6 @@ local function createDropdownFolder(parent, text)
     contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
     contentLayout.Padding = UDim.new(0, 5)
 
-    local isOpen = true
-
-    -- Sempre que um item for adicionado à pasta, o tamanho do contentFrame se ajusta
     contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
         if isOpen then
             contentFrame.Size = UDim2.new(1, 0, 0, contentLayout.AbsoluteContentSize.Y)
@@ -371,15 +369,15 @@ end
 -- Aba Combate (Organizada)
 createToggle(tabs.Combat, "Auto Attack", "AutoAttack")
 createToggle(tabs.Combat, "Aimbot (Olhar Inimigo)", "CharAimLock")
+createToggle(tabs.Combat, "Highlight Aliado", "HighlightFriendly")
+createToggle(tabs.Combat, "Highlight Inimigo", "HighlightEnemy")
 
+-- Pasta Grudar movida para o final
 local grudarFolder = createDropdownFolder(tabs.Combat, "GRUDAR")
 createToggle(grudarFolder, "Grudar no Alvo", "StickMode")
 createToggle(grudarFolder, "Teleport no Ataque", "TeleportOnAttack")
 createSlider(grudarFolder, "Distância Grudar", 0, 15, 3, "StickDistance")
 createSlider(grudarFolder, "Suavidade", 0, 95, 0, "StickSmoothness")
-
-createToggle(tabs.Combat, "Highlight Aliado", "HighlightFriendly")
-createToggle(tabs.Combat, "Highlight Inimigo", "HighlightEnemy")
 
 -- Demais Abas
 createToggle(tabs.UI, "Travar Posições UI", "LockUI")
@@ -401,12 +399,12 @@ createStepper(tabs.Test, "Alcance Auto Attack", "AttackRange", 1)
 createSlider(tabs.Test, "Alcance Aimbot", 10, 1000, 500, "AimbotRange")
 
 --// CONTEÚDO CHANGELOG
-local clText = [[Changelog v1.3 (Fix v1)
+local clText = [[Changelog v1.4
 
 O que mudou? / O que há de novo?
 
-- CORREÇÃO: A pasta "GRUDAR" agora inicializa com o tamanho e posicionamento corretos desde o primeiro segundo. As opções não vão mais "vazar" na tela ao executar o script.
-- Nova estrutura interna da UI para garantir estabilidade e fluidez nas sub-abas expansíveis.]]
+- Auto Attack agora vem ativado por padrão ao iniciar o script, pronto pra ação.
+- A pasta "GRUDAR" agora inicia fechada por padrão e foi movida para o final da aba Combate para melhorar a organização visual.]]
 
 local clLabel = Instance.new("TextLabel", tabs.Changelog)
 clLabel.Size = UDim2.new(1, -5, 0, 0)
