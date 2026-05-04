@@ -43,7 +43,7 @@ if CoreGui:FindFirstChild("DuelWarriorsUI") then CoreGui.DuelWarriorsUI:Destroy(
 task.spawn(function()
     StarterGui:SetCore("SendNotification", {
         Title = "Duel Warriors",
-        Text = "Script v1.3 carregado com sucesso!",
+        Text = "Script v1.3 (Fix v1) carregado!",
         Duration = 5
     })
     
@@ -127,7 +127,7 @@ end
 
 --// MENU PRINCIPAL E ANIMAÇÃO DE ABRIR/FECHAR
 local main = Instance.new("Frame", gui)
-main.AnchorPoint = Vector2.new(0.5, 0.5) -- Facilita a animação a partir do centro
+main.AnchorPoint = Vector2.new(0.5, 0.5)
 main.Size = UDim2.new(0, 280, 0, 320); main.Position = UDim2.new(0.5, 0, 0.5, 0)
 main.BackgroundColor3 = Color3.fromRGB(15, 15, 15); main.Visible = false; Instance.new("UICorner", main)
 local mainStroke = Instance.new("UIStroke", main); mainStroke.Thickness = 3
@@ -280,9 +280,20 @@ local function createStepper(parent, text, varName, step)
     end)
 end
 
+-- Novo Sistema de Dropdown (Pasta)
 local function createDropdownFolder(parent, text)
-    local folderBtn = Instance.new("TextButton", parent)
-    folderBtn.Size = UDim2.new(1, -5, 0, 35)
+    -- Container principal invisível que segura o Botão e o Conteúdo
+    local container = Instance.new("Frame", parent)
+    container.Size = UDim2.new(1, -5, 0, 0)
+    container.AutomaticSize = Enum.AutomaticSize.Y
+    container.BackgroundTransparency = 1
+    
+    local containerLayout = Instance.new("UIListLayout", container)
+    containerLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    containerLayout.Padding = UDim.new(0, 5)
+
+    local folderBtn = Instance.new("TextButton", container)
+    folderBtn.Size = UDim2.new(1, 0, 0, 35)
     folderBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     folderBtn.Text = "▼ " .. text
     folderBtn.TextColor3 = Color3.new(1, 1, 1)
@@ -290,33 +301,31 @@ local function createDropdownFolder(parent, text)
     Instance.new("UICorner", folderBtn)
     applyClickAnimation(folderBtn)
 
-    local contentFrame = Instance.new("Frame", parent)
-    contentFrame.Size = UDim2.new(1, -5, 0, 0)
+    local contentFrame = Instance.new("Frame", container)
+    contentFrame.Size = UDim2.new(1, 0, 0, 0)
     contentFrame.BackgroundTransparency = 1
     contentFrame.ClipsDescendants = true
-    contentFrame.Visible = true
 
-    local layout = Instance.new("UIListLayout", contentFrame)
-    layout.Padding = UDim.new(0, 5)
-    
-    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        if contentFrame.Visible then
-            contentFrame.Size = UDim2.new(1, -5, 0, layout.AbsoluteContentSize.Y)
+    local contentLayout = Instance.new("UIListLayout", contentFrame)
+    contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    contentLayout.Padding = UDim.new(0, 5)
+
+    local isOpen = true
+
+    -- Sempre que um item for adicionado à pasta, o tamanho do contentFrame se ajusta
+    contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        if isOpen then
+            contentFrame.Size = UDim2.new(1, 0, 0, contentLayout.AbsoluteContentSize.Y)
         end
     end)
 
-    local isOpen = true
     folderBtn.MouseButton1Click:Connect(function()
         isOpen = not isOpen
         folderBtn.Text = (isOpen and "▼ " or "▶ ") .. text
         if isOpen then
-            contentFrame.Visible = true
-            TweenService:Create(contentFrame, TweenInfo.new(0.3), {Size = UDim2.new(1, -5, 0, layout.AbsoluteContentSize.Y)}):Play()
+            TweenService:Create(contentFrame, TweenInfo.new(0.3), {Size = UDim2.new(1, 0, 0, contentLayout.AbsoluteContentSize.Y)}):Play()
         else
-            local tw = TweenService:Create(contentFrame, TweenInfo.new(0.3), {Size = UDim2.new(1, -5, 0, 0)})
-            tw:Play()
-            tw.Completed:Wait()
-            if not isOpen then contentFrame.Visible = false end
+            TweenService:Create(contentFrame, TweenInfo.new(0.3), {Size = UDim2.new(1, 0, 0, 0)}):Play()
         end
     end)
 
@@ -392,14 +401,12 @@ createStepper(tabs.Test, "Alcance Auto Attack", "AttackRange", 1)
 createSlider(tabs.Test, "Alcance Aimbot", 10, 1000, 500, "AimbotRange")
 
 --// CONTEÚDO CHANGELOG
-local clText = [[Changelog v1.3
+local clText = [[Changelog v1.3 (Fix v1)
 
 O que mudou? / O que há de novo?
 
-- Organização da Aba Combate: Auto Attack e Aimbot movidos para o topo.
-- Adicionada a nova sub-aba (pasta) "GRUDAR" para agrupar as funções relacionadas a movimento e precisão.
-- Animações! O menu agora conta com efeitos visuais suaves ao abrir/fechar e todos os botões encolhem levemente ao serem pressionados.
-- Texto deste changelog corrigido para exibir as notas atualizadas.]]
+- CORREÇÃO: A pasta "GRUDAR" agora inicializa com o tamanho e posicionamento corretos desde o primeiro segundo. As opções não vão mais "vazar" na tela ao executar o script.
+- Nova estrutura interna da UI para garantir estabilidade e fluidez nas sub-abas expansíveis.]]
 
 local clLabel = Instance.new("TextLabel", tabs.Changelog)
 clLabel.Size = UDim2.new(1, -5, 0, 0)
