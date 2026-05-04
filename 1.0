@@ -6,6 +6,7 @@ local UserInputService = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local Stats = game:GetService("Stats")
+local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 
 --// VARS GLOBAIS DE COMBATE
@@ -19,14 +20,15 @@ getgenv().RecordingMode = false
 getgenv().LockUI = false
 getgenv().HighlightEnemy = true
 getgenv().HighlightFriendly = true
-getgenv().ShowStats = false -- Nova variável do painel de stats
+getgenv().ShowStats = false
 
+-- Player
+getgenv().EnableSpeed = false -- Agora inicia OFF
 getgenv().StickDistance = 3
 getgenv().StickSmoothness = 0
 getgenv().WalkSpeedValue = 16
 getgenv().InfiniteJump = false
 getgenv().AntiFling = false
-
 getgenv().HealthESP = false
 getgenv().MyHealth = false
 
@@ -45,7 +47,7 @@ if CoreGui:FindFirstChild("DuelWarriorsUI") then CoreGui.DuelWarriorsUI:Destroy(
 task.spawn(function()
     StarterGui:SetCore("SendNotification", {
         Title = "Duel Warriors",
-        Text = "Script v1.5 carregado!",
+        Text = "Script v1.6 carregado!",
         Duration = 5
     })
     
@@ -106,7 +108,7 @@ myHealthLbl.Size = UDim2.new(0, 150, 0, 25); myHealthLbl.Position = UDim2.new(1,
 myHealthLbl.BackgroundTransparency = 1; myHealthLbl.Font = Enum.Font.GothamBold
 myHealthLbl.TextSize = 14; myHealthLbl.TextXAlignment = Enum.TextXAlignment.Right; myHealthLbl.TextStrokeTransparency = 0; myHealthLbl.Visible = false
 
--- Status Label (FPS, Ping, País)
+-- Status Label (FPS, Ping, País) corrigido
 local statsLbl = Instance.new("TextLabel", gui)
 statsLbl.Size = UDim2.new(0, 250, 0, 20); statsLbl.Position = UDim2.new(0, 5, 1, -25)
 statsLbl.BackgroundTransparency = 1; statsLbl.Font = Enum.Font.GothamMedium
@@ -116,8 +118,17 @@ statsLbl.Visible = false; statsLbl.ZIndex = 10
 
 local serverCountry = "Buscando..."
 task.spawn(function()
-    local success, result = pcall(function() return game:HttpGet("http://ip-api.com/country") end)
-    if success and result then serverCountry = result:gsub("\n", "") else serverCountry = "N/A" end
+    local success, result = pcall(function() return game:HttpGet("http://ip-api.com/json/") end)
+    if success and result then
+        local decodeSuccess, parsed = pcall(function() return HttpService:JSONDecode(result) end)
+        if decodeSuccess and parsed and parsed.country then
+            serverCountry = parsed.country
+        else
+            serverCountry = "Oculto"
+        end
+    else
+        serverCountry = "N/A"
+    end
 end)
 
 local function makeDraggable(guiObject, handle)
@@ -175,7 +186,7 @@ closeMenuBtn.MouseButton1Click:Connect(toggleMenu)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1, -40, 0, 35); title.Position = UDim2.new(0, 10, 0, 0)
-title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.5"; title.Font = "GothamBlack"
+title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.6"; title.Font = "GothamBlack"
 title.TextScaled = true; title.TextXAlignment = Enum.TextXAlignment.Left
 
 --// ABAS SETUP
@@ -402,6 +413,7 @@ createToggle(tabs.UI, "+ Float Aimbot", "uif2", function(s) if s then spawnFloat
 createToggle(tabs.UI, "+ Float Teleport", "uif3", function(s) if s then spawnFloatingBtn("⚡", "TeleportOnAttack") end end)
 createToggle(tabs.UI, "+ Float Grudar", "uif4", function(s) if s then spawnFloatingBtn("⚔️", "StickMode") end end)
 
+createToggle(tabs.Player, "Ativar Velocidade", "EnableSpeed")
 createSlider(tabs.Player, "Velocidade (Speed)", 16, 200, 16, "WalkSpeedValue")
 createToggle(tabs.Player, "Pulo Infinito", "InfiniteJump")
 createToggle(tabs.Player, "Anti-Ragdoll", "AntiFling")
@@ -415,12 +427,12 @@ createSlider(tabs.Test, "Alcance Aimbot", 10, 1000, 500, "AimbotRange")
 createToggle(tabs.Test, "Mostrar Status (FPS/Ping/País)", "ShowStats", function(state) statsLbl.Visible = state end)
 
 --// CONTEÚDO CHANGELOG
-local clText = [[Changelog v1.5
+local clText = [[Changelog v1.6
 
 O que mudou? / O que há de novo?
 
-- Novo Status Monitor: Adicionada opção na aba 'Teste' para mostrar o FPS, Ping e a localização (País) do Servidor no canto inferior esquerdo da tela!
-- O design do contador é discreto e não interfere na gameplay.]]
+- Nova Função de Velocidade: Agora você precisa ligar o botão 'Ativar Velocidade' para usar o Slider. Se você desligar, a velocidade volta ao normal automaticamente!
+- Status Limpo: A função de País do Servidor foi reescrita e decodificada para não mostrar códigos feios, puxando apenas o nome do lugar de forma inteligente.]]
 
 local clLabel = Instance.new("TextLabel", tabs.Changelog)
 clLabel.Size = UDim2.new(1, -5, 0, 0)
@@ -492,7 +504,7 @@ RunService.RenderStepped:Connect(function()
     if getgenv().ShowStats then
         local ping = "N/A"
         pcall(function() ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
-        statsLbl.Text = string.format("FPS: %d | Ping: %s ms | Local: %s", currentFPS, tostring(ping), serverCountry)
+        statsLbl.Text = string.format("FPS: %d | Ping: %s ms | País: %s", currentFPS, tostring(ping), serverCountry)
     end
 
     for varName, data in pairs(MenuToggles) do
@@ -514,7 +526,16 @@ RunService.RenderStepped:Connect(function()
     
     local char = LocalPlayer.Character; local hum = char and char:FindFirstChild("Humanoid")
     local root = char and char:FindFirstChild("HumanoidRootPart")
-    if hum then hum.WalkSpeed = getgenv().WalkSpeedValue end
+    
+    -- Lógica de Velocidade Corrigida
+    if hum then
+        if getgenv().EnableSpeed then
+            hum.WalkSpeed = getgenv().WalkSpeedValue
+        elseif hum.WalkSpeed == getgenv().WalkSpeedValue and getgenv().WalkSpeedValue ~= 16 then
+            hum.WalkSpeed = 16
+        end
+    end
+
     local target, dist = getClosest(); local eRoot = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
     
     if getgenv().StickMode and root and eRoot then root.CFrame = root.CFrame:Lerp(eRoot.CFrame * CFrame.new(0, 0, getgenv().StickDistance), 1 - (getgenv().StickSmoothness/100)) end
