@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
 local LocalPlayer = Players.LocalPlayer
 
 --// VARS GLOBAIS DE COMBATE
@@ -16,10 +17,6 @@ getgenv().RecordingMode = false
 getgenv().LockUI = false
 getgenv().HighlightEnemy = true
 getgenv().HighlightFriendly = true
-
--- Gestos
-getgenv().LeftSwipeBind = "AutoAttack"
-getgenv().RightSwipeBind = "CharAimLock"
 
 getgenv().StickDistance = 3
 getgenv().StickSmoothness = 0
@@ -40,6 +37,21 @@ local MenuToggles = {}
 
 --// REMOVE ANTIGO
 if CoreGui:FindFirstChild("DuelWarriorsUI") then CoreGui.DuelWarriorsUI:Destroy() end
+
+--// NOTIFICAÇÃO DE SUCESSO
+task.spawn(function()
+    StarterGui:SetCore("SendNotification", {
+        Title = "Duel Warriors",
+        Text = "Script carregado com sucesso!",
+        Duration = 5
+    })
+    
+    local sound = Instance.new("Sound", CoreGui)
+    sound.SoundId = "rbxassetid://4590657391" -- Som de notificação (Pop)
+    sound.Volume = 2
+    sound:Play()
+    game:GetService("Debris"):AddItem(sound, 3)
+end)
 
 --// FUNÇÕES CORE
 local function getRemote()
@@ -112,16 +124,14 @@ closeMenuBtn.MouseButton1Click:Connect(function() main.Visible = false end)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1, -40, 0, 35); title.Position = UDim2.new(0, 10, 0, 0)
-title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.1"; title.Font = "GothamBlack"
+title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.2"; title.Font = "GothamBlack"
 title.TextScaled = true; title.TextXAlignment = Enum.TextXAlignment.Left
-
--- (Botão 'openBtn' removido conforme solicitado, agora só abre via gesto)
 
 --// ABAS SETUP
 local tabHolder = Instance.new("ScrollingFrame", main)
 tabHolder.Size = UDim2.new(1, -10, 0, 30); tabHolder.Position = UDim2.new(0, 5, 0, 40)
 tabHolder.BackgroundTransparency = 1; tabHolder.ScrollBarThickness = 0
-tabHolder.CanvasSize = UDim2.new(0, 550, 0, 0) -- Ajustado para caber o novo botão
+tabHolder.CanvasSize = UDim2.new(0, 550, 0, 0)
 local tabLayoutH = Instance.new("UIListLayout", tabHolder)
 tabLayoutH.FillDirection = Enum.FillDirection.Horizontal; tabLayoutH.Padding = UDim.new(0, 5)
 
@@ -132,7 +142,7 @@ local tabs = {
     Whitelist = Instance.new("ScrollingFrame", main),
     Bypass = Instance.new("ScrollingFrame", main),
     Test = Instance.new("ScrollingFrame", main),
-    Changelog = Instance.new("ScrollingFrame", main) -- NOVA ABA AQUI
+    Changelog = Instance.new("ScrollingFrame", main)
 }
 
 for _, t in pairs(tabs) do
@@ -162,7 +172,7 @@ createTabBtn("Player", tabs.Player)
 createTabBtn("Whitelist", tabs.Whitelist)
 createTabBtn("Bypass", tabs.Bypass)
 createTabBtn("Teste", tabs.Test)
-createTabBtn("Changelog", tabs.Changelog) -- BOTÃO DA NOVA ABA
+createTabBtn("Changelog", tabs.Changelog)
 
 --// CONSTRUTORES DE UI
 local function createToggle(parent, text, varName, callback)
@@ -198,18 +208,6 @@ local function createSlider(parent, text, min, max, default, varName)
             local con; con = RunService.RenderStepped:Connect(move)
             UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then con:Disconnect() end end)
         end
-    end)
-end
-
-local function createBindCycler(parent, title, varToChange)
-    local options = {"AutoAttack", "CharAimLock", "TeleportOnAttack", "StickMode"}
-    local btn = Instance.new("TextButton", parent); btn.Size = UDim2.new(1, -5, 0, 38); btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    btn.TextColor3 = Color3.new(1,1,1); btn.Font = "GothamBold"; Instance.new("UICorner", btn)
-    local function getIndex() for i, v in ipairs(options) do if v == getgenv()[varToChange] then return i end end return 1 end
-    btn.Text = title .. ": " .. options[getIndex()]
-    btn.MouseButton1Click:Connect(function()
-        local nextId = getIndex() + 1; if nextId > #options then nextId = 1 end
-        getgenv()[varToChange] = options[nextId]; btn.Text = title .. ": " .. options[nextId]
     end)
 end
 
@@ -302,8 +300,6 @@ createSlider(tabs.Combat, "Distância Grudar", 0, 15, 3, "StickDistance")
 createSlider(tabs.Combat, "Suavidade", 0, 95, 0, "StickSmoothness")
 
 createToggle(tabs.UI, "Travar Posições UI", "LockUI")
-createBindCycler(tabs.UI, "Gesto Esquerdo", "LeftSwipeBind")
-createBindCycler(tabs.UI, "Gesto Direito", "RightSwipeBind")
 createToggle(tabs.UI, "Mostrar Painel Fixo", "ShowOldPanel", function(state) oldPanel.Visible = state end)
 createToggle(tabs.UI, "+ Float Auto Attack", "uif1", function(s) if s then spawnFloatingBtn("🤺", "AutoAttack") end end)
 createToggle(tabs.UI, "+ Float Aimbot", "uif2", function(s) if s then spawnFloatingBtn("👁️", "CharAimLock") end end)
@@ -322,13 +318,13 @@ createStepper(tabs.Test, "Alcance Auto Attack", "AttackRange", 1)
 createSlider(tabs.Test, "Alcance Aimbot", 10, 1000, 500, "AimbotRange")
 
 --// CONTEÚDO CHANGELOG (TEXTO ADAPTÁVEL)
-local clText = [[Changelog v1.1
+local clText = [[Changelog v1.2
 
 O que mudou? / O que há de novo?
 
-- Nova aba "Changelog" adicionada ao menu.
-- Botão visual de abrir o menu removido da tela para um visual mais limpo.
-- Abertura do menu simplificada: agora usa apenas o gesto de deslizar do centro-topo da tela para baixo!]]
+- Notificação sonora e visual adicionada para avisar quando o script for carregado.
+- Opções de 'Gesto Esquerdo/Direito' removidas do script para evitar toques acidentais e manter a UI limpa.
+- Menu agora abre deslizando a tela de cima para baixo em qualquer parte da área superior da tela.]]
 
 local clLabel = Instance.new("TextLabel", tabs.Changelog)
 clLabel.Size = UDim2.new(1, -5, 0, 0)
@@ -348,7 +344,6 @@ task.spawn(function()
         if tabs.Whitelist.Visible then
             local currentPlayers = Players:GetPlayers()
             
-            -- Ordena a tabela de jogadores por DisplayName (ou Name) em ordem alfabética
             table.sort(currentPlayers, function(a, b)
                 return a.DisplayName:lower() < b.DisplayName:lower()
             end)
@@ -377,10 +372,10 @@ UserInputService.TouchStarted:Connect(function(touch, gameProcessed) if not game
 UserInputService.TouchEnded:Connect(function(touch, gameProcessed)
     if not touchStart then return end
     local drop = touch.Position - touchStart; local screen = workspace.CurrentCamera.ViewportSize
+    -- Se o deslize para baixo for maior que 80px e começar no terço superior da tela
     if drop.Y > 80 and math.abs(drop.X) < 60 and touchStart.Y < (screen.Y * 0.3) then
-        if touchStart.X < (screen.X * 0.33) then local b = getgenv().LeftSwipeBind; getgenv()[b] = not getgenv()[b]
-        elseif touchStart.X > (screen.X * 0.66) then local b = getgenv().RightSwipeBind; getgenv()[b] = not getgenv()[b]
-        else main.Visible = not main.Visible; if main.Visible then main.Position = UDim2.new(0.5, -140, 0.5, -160) end end
+        main.Visible = not main.Visible
+        if main.Visible then main.Position = UDim2.new(0.5, -140, 0.5, -160) end
     end
     touchStart = nil
 end)
@@ -407,7 +402,6 @@ RunService.Stepped:Connect(function()
     local target, dist = getClosest(); local eRoot = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
     if getgenv().StickMode and root and eRoot then root.CFrame = root.CFrame:Lerp(eRoot.CFrame * CFrame.new(0, 0, getgenv().StickDistance), 1 - (getgenv().StickSmoothness/100)) end
     
-    -- Verificação de distância do Aimbot alterada aqui
     if getgenv().CharAimLock and root and eRoot and dist <= getgenv().AimbotRange then
         local bg = root:FindFirstChild("DW_AimGyro") or Instance.new("BodyGyro", root); bg.Name = "DW_AimGyro"; bg.MaxTorque = Vector3.new(0, math.huge, 0); bg.P = 500000
         bg.CFrame = CFrame.lookAt(root.Position, Vector3.new(eRoot.Position.X, root.Position.Y, eRoot.Position.Z))
@@ -423,7 +417,6 @@ task.spawn(function()
     while true do
         if getgenv().AutoAttack then
             local t, d = getClosest()
-            -- Verificação de distância do AutoAttack alterada aqui
             if t and d <= getgenv().AttackRange then 
                 local r = getRemote(); if r then r:FireServer({Key = "TouchATK", State = Enum.UserInputState.Begin}); task.wait(0.05); r:FireServer({Key = "TouchATK", State = Enum.UserInputState.End}) end 
             end
