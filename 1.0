@@ -4,6 +4,7 @@ local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
+local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
 --// VARS GLOBAIS DE COMBATE
@@ -42,12 +43,12 @@ if CoreGui:FindFirstChild("DuelWarriorsUI") then CoreGui.DuelWarriorsUI:Destroy(
 task.spawn(function()
     StarterGui:SetCore("SendNotification", {
         Title = "Duel Warriors",
-        Text = "Script carregado com sucesso!",
+        Text = "Script v1.3 carregado com sucesso!",
         Duration = 5
     })
     
     local sound = Instance.new("Sound", CoreGui)
-    sound.SoundId = "rbxassetid://4590657391" -- Som de notificação (Pop)
+    sound.SoundId = "rbxassetid://4590657391"
     sound.Volume = 2
     sound:Play()
     game:GetService("Debris"):AddItem(sound, 3)
@@ -77,6 +78,21 @@ local function getClosest()
         end
     end
     return closest, dist
+end
+
+--// ANIMAÇÃO DE CLIQUE UNIVERSAL
+local function applyClickAnimation(btn)
+    local origSize = btn.Size
+    btn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            TweenService:Create(btn, TweenInfo.new(0.1), {Size = UDim2.new(origSize.X.Scale, origSize.X.Offset - 4, origSize.Y.Scale, origSize.Y.Offset - 4)}):Play()
+        end
+    end)
+    btn.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            TweenService:Create(btn, TweenInfo.new(0.1), {Size = origSize}):Play()
+        end
+    end)
 end
 
 --// GUI SETUP
@@ -109,22 +125,41 @@ local function makeDraggable(guiObject, handle)
     end)
 end
 
---// MENU PRINCIPAL
+--// MENU PRINCIPAL E ANIMAÇÃO DE ABRIR/FECHAR
 local main = Instance.new("Frame", gui)
-main.Size = UDim2.new(0, 280, 0, 320); main.Position = UDim2.new(0.5, -140, 0.5, -160)
+main.AnchorPoint = Vector2.new(0.5, 0.5) -- Facilita a animação a partir do centro
+main.Size = UDim2.new(0, 280, 0, 320); main.Position = UDim2.new(0.5, 0, 0.5, 0)
 main.BackgroundColor3 = Color3.fromRGB(15, 15, 15); main.Visible = false; Instance.new("UICorner", main)
 local mainStroke = Instance.new("UIStroke", main); mainStroke.Thickness = 3
 makeDraggable(main)
+
+local isMenuAnimating = false
+local function toggleMenu()
+    if isMenuAnimating then return end
+    isMenuAnimating = true
+    if not main.Visible then
+        main.Size = UDim2.new(0, 0, 0, 0)
+        main.Visible = true
+        local tw = TweenService:Create(main, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 280, 0, 320)})
+        tw:Play()
+        tw.Completed:Connect(function() isMenuAnimating = false end)
+    else
+        local tw = TweenService:Create(main, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)})
+        tw:Play()
+        tw.Completed:Connect(function() main.Visible = false; isMenuAnimating = false end)
+    end
+end
 
 local closeMenuBtn = Instance.new("TextButton", main)
 closeMenuBtn.Size = UDim2.new(0, 30, 0, 30); closeMenuBtn.Position = UDim2.new(1, -30, 0, 2)
 closeMenuBtn.BackgroundTransparency = 1; closeMenuBtn.Text = "X"; closeMenuBtn.TextColor3 = Color3.new(1, 0, 0)
 closeMenuBtn.Font = Enum.Font.GothamBlack; closeMenuBtn.TextSize = 18
-closeMenuBtn.MouseButton1Click:Connect(function() main.Visible = false end)
+applyClickAnimation(closeMenuBtn)
+closeMenuBtn.MouseButton1Click:Connect(toggleMenu)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1, -40, 0, 35); title.Position = UDim2.new(0, 10, 0, 0)
-title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.2"; title.Font = "GothamBlack"
+title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.3"; title.Font = "GothamBlack"
 title.TextScaled = true; title.TextXAlignment = Enum.TextXAlignment.Left
 
 --// ABAS SETUP
@@ -160,6 +195,7 @@ local function createTabBtn(text, targetTab)
     btn.Size = UDim2.new(0, 70, 1, 0); btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     btn.Text = text; btn.TextColor3 = Color3.new(1, 1, 1); btn.Font = "GothamBold"; btn.TextSize = 10; btn.TextScaled = true
     Instance.new("UICorner", btn)
+    applyClickAnimation(btn)
     btn.MouseButton1Click:Connect(function()
         for _, t in pairs(tabs) do t.Visible = false end
         targetTab.Visible = true
@@ -182,6 +218,7 @@ local function createToggle(parent, text, varName, callback)
     local currentState = isGlobal and getgenv()[varName] or false
     btn.Text = text .. (currentState and " [ON]" or " [OFF]"); btn.TextColor3 = Color3.new(1,1,1); btn.Font = "GothamBold"
     Instance.new("UICorner", btn)
+    applyClickAnimation(btn)
     MenuToggles[varName] = {Btn = btn, Text = text}
     btn.MouseButton1Click:Connect(function()
         if isGlobal then getgenv()[varName] = not getgenv()[varName] end
@@ -218,31 +255,19 @@ local function createStepper(parent, text, varName, step)
     Instance.new("UICorner", frame)
 
     local lbl = Instance.new("TextLabel", frame)
-    lbl.Size = UDim2.new(1, -80, 1, 0)
-    lbl.Position = UDim2.new(0, 10, 0, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = text .. ": " .. getgenv()[varName]
-    lbl.TextColor3 = Color3.new(1, 1, 1)
-    lbl.Font = Enum.Font.GothamBold
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Size = UDim2.new(1, -80, 1, 0); lbl.Position = UDim2.new(0, 10, 0, 0)
+    lbl.BackgroundTransparency = 1; lbl.Text = text .. ": " .. getgenv()[varName]
+    lbl.TextColor3 = Color3.new(1, 1, 1); lbl.Font = Enum.Font.GothamBold; lbl.TextXAlignment = Enum.TextXAlignment.Left
 
     local minusBtn = Instance.new("TextButton", frame)
-    minusBtn.Size = UDim2.new(0, 30, 0, 30)
-    minusBtn.Position = UDim2.new(1, -75, 0.5, -15)
-    minusBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    minusBtn.Text = "-"
-    minusBtn.TextColor3 = Color3.new(1, 1, 1)
-    minusBtn.Font = Enum.Font.GothamBold
-    Instance.new("UICorner", minusBtn)
+    minusBtn.Size = UDim2.new(0, 30, 0, 30); minusBtn.Position = UDim2.new(1, -75, 0.5, -15)
+    minusBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40); minusBtn.Text = "-"; minusBtn.TextColor3 = Color3.new(1, 1, 1); minusBtn.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", minusBtn); applyClickAnimation(minusBtn)
 
     local plusBtn = Instance.new("TextButton", frame)
-    plusBtn.Size = UDim2.new(0, 30, 0, 30)
-    plusBtn.Position = UDim2.new(1, -35, 0.5, -15)
-    plusBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    plusBtn.Text = "+"
-    plusBtn.TextColor3 = Color3.new(1, 1, 1)
-    plusBtn.Font = Enum.Font.GothamBold
-    Instance.new("UICorner", plusBtn)
+    plusBtn.Size = UDim2.new(0, 30, 0, 30); plusBtn.Position = UDim2.new(1, -35, 0.5, -15)
+    plusBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40); plusBtn.Text = "+"; plusBtn.TextColor3 = Color3.new(1, 1, 1); plusBtn.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", plusBtn); applyClickAnimation(plusBtn)
 
     minusBtn.MouseButton1Click:Connect(function()
         getgenv()[varName] = math.max(0, getgenv()[varName] - step)
@@ -253,6 +278,49 @@ local function createStepper(parent, text, varName, step)
         getgenv()[varName] = getgenv()[varName] + step
         lbl.Text = text .. ": " .. getgenv()[varName]
     end)
+end
+
+local function createDropdownFolder(parent, text)
+    local folderBtn = Instance.new("TextButton", parent)
+    folderBtn.Size = UDim2.new(1, -5, 0, 35)
+    folderBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    folderBtn.Text = "▼ " .. text
+    folderBtn.TextColor3 = Color3.new(1, 1, 1)
+    folderBtn.Font = Enum.Font.GothamBlack
+    Instance.new("UICorner", folderBtn)
+    applyClickAnimation(folderBtn)
+
+    local contentFrame = Instance.new("Frame", parent)
+    contentFrame.Size = UDim2.new(1, -5, 0, 0)
+    contentFrame.BackgroundTransparency = 1
+    contentFrame.ClipsDescendants = true
+    contentFrame.Visible = true
+
+    local layout = Instance.new("UIListLayout", contentFrame)
+    layout.Padding = UDim.new(0, 5)
+    
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        if contentFrame.Visible then
+            contentFrame.Size = UDim2.new(1, -5, 0, layout.AbsoluteContentSize.Y)
+        end
+    end)
+
+    local isOpen = true
+    folderBtn.MouseButton1Click:Connect(function()
+        isOpen = not isOpen
+        folderBtn.Text = (isOpen and "▼ " or "▶ ") .. text
+        if isOpen then
+            contentFrame.Visible = true
+            TweenService:Create(contentFrame, TweenInfo.new(0.3), {Size = UDim2.new(1, -5, 0, layout.AbsoluteContentSize.Y)}):Play()
+        else
+            local tw = TweenService:Create(contentFrame, TweenInfo.new(0.3), {Size = UDim2.new(1, -5, 0, 0)})
+            tw:Play()
+            tw.Completed:Wait()
+            if not isOpen then contentFrame.Visible = false end
+        end
+    end)
+
+    return contentFrame
 end
 
 --// PAINEL ANTIGO E BOTÕES FLUTUANTES
@@ -269,6 +337,7 @@ local OldPanelBtns = {}
 local function createOldPanelBtn(emoji, varName)
     local b = Instance.new("TextButton", oldPanel); b.Size = UDim2.new(0, 30, 0, 30); b.Text = emoji; b.TextScaled = true; b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     Instance.new("UICorner", b, {CornerRadius = UDim.new(1, 0)}); Instance.new("UIAspectRatioConstraint", b, {AspectRatio = 1})
+    applyClickAnimation(b)
     b.MouseButton1Click:Connect(function() getgenv()[varName] = not getgenv()[varName] end)
     table.insert(OldPanelBtns, {Btn = b, Var = varName})
 end
@@ -280,25 +349,30 @@ local function spawnFloatingBtn(emoji, varName)
     frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20); Instance.new("UICorner", frame, {CornerRadius = UDim.new(1, 0)})
     Instance.new("UIAspectRatioConstraint", frame, {AspectRatio = 1})
     local btn = Instance.new("TextButton", frame); btn.Size = UDim2.new(1, 0, 1, 0); btn.BackgroundTransparency = 1; btn.Text = emoji; btn.TextScaled = true
-    Instance.new("UICorner", btn, {CornerRadius = UDim.new(1, 0)}); makeDraggable(frame, btn)
+    Instance.new("UICorner", btn, {CornerRadius = UDim.new(1, 0)}); makeDraggable(frame, btn); applyClickAnimation(btn)
     local xBtn = Instance.new("TextButton", frame); xBtn.Size = UDim2.new(0, 14, 0, 14); xBtn.Position = UDim2.new(1, -8, 0, -5)
     xBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0); xBtn.Text = "X"; xBtn.TextColor3 = Color3.new(1,1,1); xBtn.Font = Enum.Font.GothamBold; xBtn.TextScaled = true
-    Instance.new("UICorner", xBtn, {CornerRadius = UDim.new(1, 0)})
+    Instance.new("UICorner", xBtn, {CornerRadius = UDim.new(1, 0)}); applyClickAnimation(xBtn)
     btn.MouseButton1Click:Connect(function() getgenv()[varName] = not getgenv()[varName] end)
     xBtn.MouseButton1Click:Connect(function() frame:Destroy() ActiveFloatingButtons[varName] = nil end)
     ActiveFloatingButtons[varName] = {Frame = frame, Btn = btn}
 end
 
 --// CONTEÚDO ABAS
+-- Aba Combate (Organizada)
 createToggle(tabs.Combat, "Auto Attack", "AutoAttack")
-createToggle(tabs.Combat, "Teleport no Ataque", "TeleportOnAttack")
-createToggle(tabs.Combat, "Grudar no Alvo", "StickMode")
 createToggle(tabs.Combat, "Aimbot (Olhar Inimigo)", "CharAimLock")
+
+local grudarFolder = createDropdownFolder(tabs.Combat, "GRUDAR")
+createToggle(grudarFolder, "Grudar no Alvo", "StickMode")
+createToggle(grudarFolder, "Teleport no Ataque", "TeleportOnAttack")
+createSlider(grudarFolder, "Distância Grudar", 0, 15, 3, "StickDistance")
+createSlider(grudarFolder, "Suavidade", 0, 95, 0, "StickSmoothness")
+
 createToggle(tabs.Combat, "Highlight Aliado", "HighlightFriendly")
 createToggle(tabs.Combat, "Highlight Inimigo", "HighlightEnemy")
-createSlider(tabs.Combat, "Distância Grudar", 0, 15, 3, "StickDistance")
-createSlider(tabs.Combat, "Suavidade", 0, 95, 0, "StickSmoothness")
 
+-- Demais Abas
 createToggle(tabs.UI, "Travar Posições UI", "LockUI")
 createToggle(tabs.UI, "Mostrar Painel Fixo", "ShowOldPanel", function(state) oldPanel.Visible = state end)
 createToggle(tabs.UI, "+ Float Auto Attack", "uif1", function(s) if s then spawnFloatingBtn("🤺", "AutoAttack") end end)
@@ -317,14 +391,15 @@ createToggle(tabs.Bypass, "Modo Gravação (Invisível)", "RecordingMode")
 createStepper(tabs.Test, "Alcance Auto Attack", "AttackRange", 1)
 createSlider(tabs.Test, "Alcance Aimbot", 10, 1000, 500, "AimbotRange")
 
---// CONTEÚDO CHANGELOG (TEXTO ADAPTÁVEL)
-local clText = [[Changelog v1.2
+--// CONTEÚDO CHANGELOG
+local clText = [[Changelog v1.3
 
 O que mudou? / O que há de novo?
 
-- Notificação sonora e visual adicionada para avisar quando o script for carregado.
-- Opções de 'Gesto Esquerdo/Direito' removidas do script para evitar toques acidentais e manter a UI limpa.
-- Menu agora abre deslizando a tela de cima para baixo em qualquer parte da área superior da tela.]]
+- Organização da Aba Combate: Auto Attack e Aimbot movidos para o topo.
+- Adicionada a nova sub-aba (pasta) "GRUDAR" para agrupar as funções relacionadas a movimento e precisão.
+- Animações! O menu agora conta com efeitos visuais suaves ao abrir/fechar e todos os botões encolhem levemente ao serem pressionados.
+- Texto deste changelog corrigido para exibir as notas atualizadas.]]
 
 local clLabel = Instance.new("TextLabel", tabs.Changelog)
 clLabel.Size = UDim2.new(1, -5, 0, 0)
@@ -338,12 +413,11 @@ clLabel.TextWrapped = true
 clLabel.TextXAlignment = Enum.TextXAlignment.Left
 clLabel.TextYAlignment = Enum.TextYAlignment.Top
 
---// ABA WHITELIST (ORDEM ALFABÉTICA A-Z)
+--// ABA WHITELIST
 task.spawn(function()
     while true do
         if tabs.Whitelist.Visible then
             local currentPlayers = Players:GetPlayers()
-            
             table.sort(currentPlayers, function(a, b)
                 return a.DisplayName:lower() < b.DisplayName:lower()
             end)
@@ -355,6 +429,7 @@ task.spawn(function()
                     local b = Instance.new("TextButton", tabs.Whitelist); b.Size = UDim2.new(1, 0, 0, 30)
                     b.Text = p.DisplayName; b.BackgroundColor3 = isWhitelisted(p) and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(40, 40, 40)
                     b.TextColor3 = Color3.new(1,1,1); b.Font = Enum.Font.Gotham; Instance.new("UICorner", b)
+                    applyClickAnimation(b)
                     b.MouseButton1Click:Connect(function()
                         whitelist[p.UserId] = not whitelist[p.UserId]
                         b.BackgroundColor3 = whitelist[p.UserId] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(40, 40, 40)
@@ -372,10 +447,8 @@ UserInputService.TouchStarted:Connect(function(touch, gameProcessed) if not game
 UserInputService.TouchEnded:Connect(function(touch, gameProcessed)
     if not touchStart then return end
     local drop = touch.Position - touchStart; local screen = workspace.CurrentCamera.ViewportSize
-    -- Se o deslize para baixo for maior que 80px e começar no terço superior da tela
     if drop.Y > 80 and math.abs(drop.X) < 60 and touchStart.Y < (screen.Y * 0.3) then
-        main.Visible = not main.Visible
-        if main.Visible then main.Position = UDim2.new(0.5, -140, 0.5, -160) end
+        toggleMenu()
     end
     touchStart = nil
 end)
