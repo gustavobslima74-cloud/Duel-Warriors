@@ -5,10 +5,11 @@ local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
+local Stats = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 
 --// VARS GLOBAIS DE COMBATE
-getgenv().AutoAttack = true -- AGORA INICIA ATIVADO
+getgenv().AutoAttack = true
 getgenv().StickMode = false
 getgenv().TeleportOnAttack = false
 getgenv().CharAimLock = false
@@ -18,6 +19,7 @@ getgenv().RecordingMode = false
 getgenv().LockUI = false
 getgenv().HighlightEnemy = true
 getgenv().HighlightFriendly = true
+getgenv().ShowStats = false -- Nova variável do painel de stats
 
 getgenv().StickDistance = 3
 getgenv().StickSmoothness = 0
@@ -43,7 +45,7 @@ if CoreGui:FindFirstChild("DuelWarriorsUI") then CoreGui.DuelWarriorsUI:Destroy(
 task.spawn(function()
     StarterGui:SetCore("SendNotification", {
         Title = "Duel Warriors",
-        Text = "Script v1.4 carregado!",
+        Text = "Script v1.5 carregado!",
         Duration = 5
     })
     
@@ -104,6 +106,20 @@ myHealthLbl.Size = UDim2.new(0, 150, 0, 25); myHealthLbl.Position = UDim2.new(1,
 myHealthLbl.BackgroundTransparency = 1; myHealthLbl.Font = Enum.Font.GothamBold
 myHealthLbl.TextSize = 14; myHealthLbl.TextXAlignment = Enum.TextXAlignment.Right; myHealthLbl.TextStrokeTransparency = 0; myHealthLbl.Visible = false
 
+-- Status Label (FPS, Ping, País)
+local statsLbl = Instance.new("TextLabel", gui)
+statsLbl.Size = UDim2.new(0, 250, 0, 20); statsLbl.Position = UDim2.new(0, 5, 1, -25)
+statsLbl.BackgroundTransparency = 1; statsLbl.Font = Enum.Font.GothamMedium
+statsLbl.TextSize = 12; statsLbl.TextColor3 = Color3.new(1, 1, 1)
+statsLbl.TextStrokeTransparency = 0.3; statsLbl.TextXAlignment = Enum.TextXAlignment.Left
+statsLbl.Visible = false; statsLbl.ZIndex = 10
+
+local serverCountry = "Buscando..."
+task.spawn(function()
+    local success, result = pcall(function() return game:HttpGet("http://ip-api.com/country") end)
+    if success and result then serverCountry = result:gsub("\n", "") else serverCountry = "N/A" end
+end)
+
 local function makeDraggable(guiObject, handle)
     local dragging, dragInput, dragStart, startPos
     local target = handle or guiObject
@@ -159,7 +175,7 @@ closeMenuBtn.MouseButton1Click:Connect(toggleMenu)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1, -40, 0, 35); title.Position = UDim2.new(0, 10, 0, 0)
-title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.4"; title.Font = "GothamBlack"
+title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.5"; title.Font = "GothamBlack"
 title.TextScaled = true; title.TextXAlignment = Enum.TextXAlignment.Left
 
 --// ABAS SETUP
@@ -291,19 +307,19 @@ local function createDropdownFolder(parent, text)
     containerLayout.SortOrder = Enum.SortOrder.LayoutOrder
     containerLayout.Padding = UDim.new(0, 5)
 
-    local isOpen = false -- AGORA INICIA FECHADA
+    local isOpen = false 
 
     local folderBtn = Instance.new("TextButton", container)
     folderBtn.Size = UDim2.new(1, 0, 0, 35)
     folderBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    folderBtn.Text = "▶ " .. text -- SETA INDICANDO FECHADO
+    folderBtn.Text = "▶ " .. text 
     folderBtn.TextColor3 = Color3.new(1, 1, 1)
     folderBtn.Font = Enum.Font.GothamBlack
     Instance.new("UICorner", folderBtn)
     applyClickAnimation(folderBtn)
 
     local contentFrame = Instance.new("Frame", container)
-    contentFrame.Size = UDim2.new(1, 0, 0, 0) -- TAMANHO ZERO INICIAL
+    contentFrame.Size = UDim2.new(1, 0, 0, 0) 
     contentFrame.BackgroundTransparency = 1
     contentFrame.ClipsDescendants = true
 
@@ -366,13 +382,12 @@ local function spawnFloatingBtn(emoji, varName)
 end
 
 --// CONTEÚDO ABAS
--- Aba Combate (Organizada)
+-- Aba Combate 
 createToggle(tabs.Combat, "Auto Attack", "AutoAttack")
 createToggle(tabs.Combat, "Aimbot (Olhar Inimigo)", "CharAimLock")
 createToggle(tabs.Combat, "Highlight Aliado", "HighlightFriendly")
 createToggle(tabs.Combat, "Highlight Inimigo", "HighlightEnemy")
 
--- Pasta Grudar movida para o final
 local grudarFolder = createDropdownFolder(tabs.Combat, "GRUDAR")
 createToggle(grudarFolder, "Grudar no Alvo", "StickMode")
 createToggle(grudarFolder, "Teleport no Ataque", "TeleportOnAttack")
@@ -397,14 +412,15 @@ createToggle(tabs.Bypass, "Modo Gravação (Invisível)", "RecordingMode")
 
 createStepper(tabs.Test, "Alcance Auto Attack", "AttackRange", 1)
 createSlider(tabs.Test, "Alcance Aimbot", 10, 1000, 500, "AimbotRange")
+createToggle(tabs.Test, "Mostrar Status (FPS/Ping/País)", "ShowStats", function(state) statsLbl.Visible = state end)
 
 --// CONTEÚDO CHANGELOG
-local clText = [[Changelog v1.4
+local clText = [[Changelog v1.5
 
 O que mudou? / O que há de novo?
 
-- Auto Attack agora vem ativado por padrão ao iniciar o script, pronto pra ação.
-- A pasta "GRUDAR" agora inicia fechada por padrão e foi movida para o final da aba Combate para melhorar a organização visual.]]
+- Novo Status Monitor: Adicionada opção na aba 'Teste' para mostrar o FPS, Ping e a localização (País) do Servidor no canto inferior esquerdo da tela!
+- O design do contador é discreto e não interfere na gameplay.]]
 
 local clLabel = Instance.new("TextLabel", tabs.Changelog)
 clLabel.Size = UDim2.new(1, -5, 0, 0)
@@ -458,8 +474,27 @@ UserInputService.TouchEnded:Connect(function(touch, gameProcessed)
     touchStart = nil
 end)
 
---// LOOPS PRINCIPAIS
-RunService.Stepped:Connect(function()
+--// LOOPS PRINCIPAIS (Combate e HUD)
+local lastTick = tick()
+local frameCount = 0
+local currentFPS = 60
+
+RunService.RenderStepped:Connect(function()
+    -- Calculadora de FPS
+    frameCount = frameCount + 1
+    if tick() - lastTick >= 1 then
+        currentFPS = frameCount
+        frameCount = 0
+        lastTick = tick()
+    end
+
+    -- Atualiza Status
+    if getgenv().ShowStats then
+        local ping = "N/A"
+        pcall(function() ping = math.floor(Stats.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
+        statsLbl.Text = string.format("FPS: %d | Ping: %s ms | Local: %s", currentFPS, tostring(ping), serverCountry)
+    end
+
     for varName, data in pairs(MenuToggles) do
         local state = getgenv()[varName]
         if data.Btn and data.Text then
@@ -472,12 +507,16 @@ RunService.Stepped:Connect(function()
     local isRec = getgenv().RecordingMode
     
     oldPanel.BackgroundTransparency = isRec and 1 or 0; oldStroke.Transparency = isRec and 1 or 0; moveHandle.Visible = not isRec
+    statsLbl.TextTransparency = isRec and 1 or 0; statsLbl.TextStrokeTransparency = isRec and 1 or 0.3
+    
     for _, data in pairs(OldPanelBtns) do data.Btn.BackgroundTransparency = isRec and 1 or 0; data.Btn.TextTransparency = isRec and 1 or 0; if not isRec then data.Btn.BackgroundColor3 = getgenv()[data.Var] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30) end end
     for varName, data in pairs(ActiveFloatingButtons) do data.Frame.BackgroundTransparency = isRec and 1 or 0; data.Btn.TextTransparency = isRec and 1 or 0; local x = data.Frame:FindFirstChildOfClass("TextButton"); if x then x.Visible = not isRec end; if not isRec then data.Frame.BackgroundColor3 = getgenv()[varName] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(20, 20, 20) end end
+    
     local char = LocalPlayer.Character; local hum = char and char:FindFirstChild("Humanoid")
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if hum then hum.WalkSpeed = getgenv().WalkSpeedValue end
     local target, dist = getClosest(); local eRoot = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+    
     if getgenv().StickMode and root and eRoot then root.CFrame = root.CFrame:Lerp(eRoot.CFrame * CFrame.new(0, 0, getgenv().StickDistance), 1 - (getgenv().StickSmoothness/100)) end
     
     if getgenv().CharAimLock and root and eRoot and dist <= getgenv().AimbotRange then
