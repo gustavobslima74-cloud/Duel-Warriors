@@ -1,90 +1,128 @@
 --// SERVICES
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
-local StarterGui = game:GetService("StarterGui")
 
---// VARS
-getgenv().DebugHits = true
+--// REMOVE ANTIGO
+if CoreGui:FindFirstChild("ComboDebugUI") then CoreGui.ComboDebugUI:Destroy() end
 
---// FUNÇÃO DE NOTIFICAÇÃO
-local function notify(title, text)
-    StarterGui:SetCore("SendNotification", {
-        Title = title,
-        Text = text,
-        Duration = 3
-    })
+--// INTERFACE PRINCIPAL
+local gui = Instance.new("ScreenGui", CoreGui)
+gui.Name = "ComboDebugUI"
+
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0, 250, 0, 300)
+main.Position = UDim2.new(0.5, -125, 0.5, -150)
+main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+main.BorderSizePixel = 0
+main.Visible = true
+
+local corner = Instance.new("UICorner", main)
+local stroke = Instance.new("UIStroke", main)
+stroke.Color = Color3.fromRGB(0, 170, 255)
+stroke.Thickness = 2
+
+--// BARRA DE TÍTULO (ARRASTÁVEL)
+local titleBar = Instance.new("Frame", main)
+titleBar.Size = UDim2.new(1, 0, 0, 35)
+titleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Instance.new("UICorner", titleBar)
+
+local titleTxt = Instance.new("TextLabel", titleBar)
+titleTxt.Size = UDim2.new(1, -40, 1, 0)
+titleTxt.Position = UDim2.new(0, 10, 0, 0)
+titleTxt.Text = "COMBO EXPLORER"
+titleTxt.TextColor3 = Color3.new(1,1,1)
+titleTxt.Font = Enum.Font.GothamBold
+titleTxt.TextXAlignment = Enum.TextXAlignment.Left
+titleTxt.BackgroundTransparency = 1
+
+--// FUNÇÃO ARRASTAR (DRAGGABLE)
+local dragging, dragInput, dragStart, startPos
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true; dragStart = input.Position; startPos = main.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+
+--// LISTA DE BOTÕES
+local container = Instance.new("ScrollingFrame", main)
+container.Size = UDim2.new(1, -10, 1, -45)
+container.Position = UDim2.new(0, 5, 0, 40)
+container.BackgroundTransparency = 1
+container.ScrollBarThickness = 2
+local layout = Instance.new("UIListLayout", container); layout.Padding = UDim.new(0, 5)
+
+local function createBtn(text, color, callback)
+    local btn = Instance.new("TextButton", container)
+    btn.Size = UDim2.new(1, 0, 0, 35)
+    btn.BackgroundColor3 = color
+    btn.Text = text
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.Font = Enum.Font.GothamMedium
+    Instance.new("UICorner", btn)
+    btn.MouseButton1Click:Connect(callback)
+    return btn
 end
 
---// PROCURANDO O REMOTE DE COMUNICAÇÃO
--- Baseado no seu script anterior, o remote fica em workspace.Player.Nome.Communicate
-local function getCommRemote()
-    local charFolder = workspace:FindFirstChild("Player")
-    local plrFolder = charFolder and charFolder:FindFirstChild(LocalPlayer.Name)
-    return plrFolder and plrFolder:FindFirstChild("Communicate")
-end
+--// BOTÕES DE TESTE
+createBtn("Ativar Logger (F9)", Color3.fromRGB(80, 80, 80), function()
+    getgenv().LogRemotes = not getgenv().LogRemotes
+    print("LOG DE REMOTES: " .. (getgenv().LogRemotes and "ON" or "OFF"))
+end)
 
---// 1. DETECTAR HITS (MONITORANDO O REMOTE)
--- Aqui vamos interceptar quando você envia um sinal de ataque e ver se o jogo responde
-local mt = getrawmetatable(game)
-local old = mt.__namecall
-setreadonly(mt, false)
+createBtn("Testar 'Dash'", Color3.fromRGB(0, 120, 200), function()
+    local r = workspace.Player[LocalPlayer.Name]:FindFirstChild("Communicate")
+    if r then r:FireServer({Key = "Dash", State = Enum.UserInputState.Begin}) end
+end)
 
-mt.__namecall = newcclosure(function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
-    
-    if method == "FireServer" and self.Name == "Communicate" then
-        -- Se o argumento possuir algo relacionado a Hit ou Dano
-        if args[1] and (args[1].Key == "TouchATK" or args[1].Type == "Hit") then
-            if getgenv().DebugHits then
-                warn("--- HIT LOCALIZADO ---")
-                print("Argumentos enviados:", game:GetService("HttpService"):JSONEncode(args[1]))
-                notify("Combo Debug", "HIT LOCALIZADO! Cheque o Console (F9)")
+createBtn("Testar 'Dodge'", Color3.fromRGB(0, 120, 200), function()
+    local r = workspace.Player[LocalPlayer.Name]:FindFirstChild("Communicate")
+    if r then r:FireServer({Key = "Dodge", State = Enum.UserInputState.Begin}) end
+end)
+
+--// ABRIR/FECHAR (TECLA 'L')
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.L then
+        main.Visible = not main.Visible
+    end
+end)
+
+--// SCANNER DE HITS (HP)
+local enemyHealth = {}
+RunService.Heartbeat:Connect(function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Humanoid") then
+            local h = p.Character.Humanoid
+            if enemyHealth[p.UserId] and h.Health < enemyHealth[p.UserId] then
+                warn("!!! HIT DETECTADO EM: " .. p.DisplayName .. " !!!")
             end
+            enemyHealth[p.UserId] = h.Health
         end
     end
-    return old(self, ...)
 end)
 
-setreadonly(mt, true)
-
---// 2. CRIAÇÃO DA UI DE TESTE (SIMPLES)
-local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
-local Frame = Instance.new("Frame", ScreenGui)
-Frame.Size = UDim2.new(0, 200, 0, 150)
-Frame.Position = UDim2.new(0.8, 0, 0.5, 0)
-Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-
-local layout = Instance.new("UIListLayout", Frame)
-layout.Padding = UDim.new(0, 5)
-
-local function createTestBtn(text, callback)
-    local btn = Instance.new("TextButton", Frame)
-    btn.Size = UDim2.new(1, 0, 0, 40)
-    btn.Text = text
-    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.MouseButton1Click:Connect(callback)
-end
-
---// BOTÃO TESTAR ROLL
-createTestBtn("Testar ROLL (Desviar)", function()
-    local r = getCommRemote()
-    if r then
-        -- Tentando disparar o Roll. Geralmente jogos usam "Roll", "Dash" ou "Dodge"
-        r:FireServer({Key = "Roll", State = Enum.UserInputState.Begin})
-        task.wait(0.1)
-        r:FireServer({Key = "Roll", State = Enum.UserInputState.End})
-        notify("Teste", "Sinal de Roll enviado!")
-    else
-        notify("Erro", "Remote não encontrado!")
+--// MONITOR DE REMOTES (HOOK)
+local oldNamecall
+oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+    local args = {...}
+    local method = getnamecallmethod()
+    if getgenv().LogRemotes and method == "FireServer" and self.Name == "Communicate" then
+        print("----------")
+        print("Remote Chamado: " .. self.Name)
+        print("Argumentos: ", game:GetService("HttpService"):JSONEncode(args[1]))
     end
+    return oldNamecall(self, ...)
 end)
 
---// BOTÃO LIMPAR CONSOLE
-createTestBtn("Limpar Log", function()
-    print("\126") -- Limpa o console interno
-    notify("Debug", "Log limpo.")
-end)
-
-notify("Auto Combo Debug", "Script de teste carregado!")
+print("Menu carregado! Aperte 'L' para abrir/fechar.")
