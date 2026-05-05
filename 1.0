@@ -6,41 +6,67 @@ local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
---// REMOVE ANTIGO
+--// REMOVE ANTIGO PARA EVITAR SOBREPOSIÇÃO
 if CoreGui:FindFirstChild("ComboDebugUI") then CoreGui.ComboDebugUI:Destroy() end
 
 --// INTERFACE PRINCIPAL
 local gui = Instance.new("ScreenGui", CoreGui)
 gui.Name = "ComboDebugUI"
 
+--// BOTÃO FLUTUANTE (ABRIR/FECHAR)
+local toggleBtn = Instance.new("TextButton", gui)
+toggleBtn.Size = UDim2.new(0, 50, 0, 50)
+toggleBtn.Position = UDim2.new(0, 10, 0.5, -25) -- Canto esquerdo central
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+toggleBtn.Text = "MENU"
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 12
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
+local btnStroke = Instance.new("UIStroke", toggleBtn)
+btnStroke.Thickness = 2
+btnStroke.Color = Color3.new(1, 1, 1)
+
+--// FRAME PRINCIPAL
 local main = Instance.new("Frame", gui)
-main.Size = UDim2.new(0, 250, 0, 300)
-main.Position = UDim2.new(0.5, -125, 0.5, -150)
-main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-main.BorderSizePixel = 0
-main.Visible = true
+main.Size = UDim2.new(0, 260, 0, 320)
+main.AnchorPoint = Vector2.new(0.5, 0.5) -- Define o centro como ponto de referência
+main.Position = UDim2.new(0.5, 0, 0.5, 0) -- Posição inicial no meio
+main.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+main.Visible = false -- Começa fechado
 
 local corner = Instance.new("UICorner", main)
 local stroke = Instance.new("UIStroke", main)
 stroke.Color = Color3.fromRGB(0, 170, 255)
 stroke.Thickness = 2
 
+--// FUNÇÃO PARA ABRIR NO MEIO
+local function toggleMenu()
+    if not main.Visible then
+        main.Position = UDim2.new(0.5, 0, 0.5, 0) -- Força o centro ao abrir
+        main.Visible = true
+        main:TweenSize(UDim2.new(0, 260, 0, 320), "Out", "Back", 0.3, true)
+    else
+        main.Visible = false
+    end
+end
+
+toggleBtn.MouseButton1Click:Connect(toggleMenu)
+
 --// BARRA DE TÍTULO (ARRASTÁVEL)
 local titleBar = Instance.new("Frame", main)
 titleBar.Size = UDim2.new(1, 0, 0, 35)
-titleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+titleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 Instance.new("UICorner", titleBar)
 
 local titleTxt = Instance.new("TextLabel", titleBar)
-titleTxt.Size = UDim2.new(1, -40, 1, 0)
-titleTxt.Position = UDim2.new(0, 10, 0, 0)
-titleTxt.Text = "COMBO EXPLORER"
+titleTxt.Size = UDim2.new(1, 0, 1, 0)
+titleTxt.Text = "COMBO EXPLORER v2"
 titleTxt.TextColor3 = Color3.new(1,1,1)
 titleTxt.Font = Enum.Font.GothamBold
-titleTxt.TextXAlignment = Enum.TextXAlignment.Left
 titleTxt.BackgroundTransparency = 1
 
---// FUNÇÃO ARRASTAR (DRAGGABLE)
+--// SISTEMA DE ARRASTAR (DRAGGABLE)
 local dragging, dragInput, dragStart, startPos
 titleBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -57,7 +83,7 @@ UserInputService.InputEnded:Connect(function(input) if input.UserInputType == En
 
 --// LISTA DE BOTÕES
 local container = Instance.new("ScrollingFrame", main)
-container.Size = UDim2.new(1, -10, 1, -45)
+container.Size = UDim2.new(1, -10, 1, -50)
 container.Position = UDim2.new(0, 5, 0, 40)
 container.BackgroundTransparency = 1
 container.ScrollBarThickness = 2
@@ -65,64 +91,61 @@ local layout = Instance.new("UIListLayout", container); layout.Padding = UDim.ne
 
 local function createBtn(text, color, callback)
     local btn = Instance.new("TextButton", container)
-    btn.Size = UDim2.new(1, 0, 0, 35)
+    btn.Size = UDim2.new(1, -5, 0, 40)
     btn.BackgroundColor3 = color
     btn.Text = text
     btn.TextColor3 = Color3.new(1,1,1)
     btn.Font = Enum.Font.GothamMedium
+    btn.TextSize = 14
     Instance.new("UICorner", btn)
     btn.MouseButton1Click:Connect(callback)
-    return btn
 end
 
---// BOTÕES DE TESTE
-createBtn("Ativar Logger (F9)", Color3.fromRGB(80, 80, 80), function()
+--// BOTÕES DE TESTE E LOG
+createBtn("📡 ATIVAR LOGGER (F9)", Color3.fromRGB(60, 60, 60), function()
     getgenv().LogRemotes = not getgenv().LogRemotes
-    print("LOG DE REMOTES: " .. (getgenv().LogRemotes and "ON" or "OFF"))
+    print("--- LOG DE REMOTES: " .. (getgenv().LogRemotes and "LIGADO" or "DESLIGADO") .. " ---")
 end)
 
-createBtn("Testar 'Dash'", Color3.fromRGB(0, 120, 200), function()
+createBtn("🌪️ TESTAR ROLL", Color3.fromRGB(0, 100, 200), function()
     local r = workspace.Player[LocalPlayer.Name]:FindFirstChild("Communicate")
-    if r then r:FireServer({Key = "Dash", State = Enum.UserInputState.Begin}) end
-end)
-
-createBtn("Testar 'Dodge'", Color3.fromRGB(0, 120, 200), function()
-    local r = workspace.Player[LocalPlayer.Name]:FindFirstChild("Communicate")
-    if r then r:FireServer({Key = "Dodge", State = Enum.UserInputState.Begin}) end
-end)
-
---// ABRIR/FECHAR (TECLA 'L')
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if not gpe and input.KeyCode == Enum.KeyCode.L then
-        main.Visible = not main.Visible
+    if r then 
+        r:FireServer({Key = "Roll", State = Enum.UserInputState.Begin})
+        task.wait(0.1)
+        r:FireServer({Key = "Roll", State = Enum.UserInputState.End})
     end
 end)
 
---// SCANNER DE HITS (HP)
+createBtn("🧹 LIMPAR CONSOLE", Color3.fromRGB(150, 0, 0), function()
+    print("\126")
+end)
+
+--// MONITOR DE HITS (HP)
 local enemyHealth = {}
 RunService.Heartbeat:Connect(function()
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Humanoid") then
             local h = p.Character.Humanoid
             if enemyHealth[p.UserId] and h.Health < enemyHealth[p.UserId] then
-                warn("!!! HIT DETECTADO EM: " .. p.DisplayName .. " !!!")
+                print("💥 DANO DETECTADO EM: " .. p.DisplayName)
             end
             enemyHealth[p.UserId] = h.Health
         end
     end
 end)
 
---// MONITOR DE REMOTES (HOOK)
+--// HOOK PARA PEGAR O NOME DAS TECLAS (REMOTE LOG)
 local oldNamecall
 oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
     local args = {...}
     local method = getnamecallmethod()
     if getgenv().LogRemotes and method == "FireServer" and self.Name == "Communicate" then
-        print("----------")
-        print("Remote Chamado: " .. self.Name)
-        print("Argumentos: ", game:GetService("HttpService"):JSONEncode(args[1]))
+        warn("CAPTURA: " .. game:GetService("HttpService"):JSONEncode(args[1]))
     end
     return oldNamecall(self, ...)
 end)
 
-print("Menu carregado! Aperte 'L' para abrir/fechar.")
+-- Tecla 'L' também funciona para abrir/fechar
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.L then toggleMenu() end
+end)
