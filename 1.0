@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService") -- Serviço necessário para o JSON
 local LocalPlayer = Players.LocalPlayer
 
 --// REMOVE ANTIGO
@@ -48,13 +49,17 @@ createBtn("📡 ATIVAR LOGGER (F9)", Color3.fromRGB(60, 60, 60), function()
 end)
 
 createBtn("🌪️ TESTAR ROLL", Color3.fromRGB(0, 100, 200), function()
-    local r = workspace.Player[LocalPlayer.Name]:FindFirstChild("Communicate")
+    local r = workspace:FindFirstChild("Player") and workspace.Player:FindFirstChild(LocalPlayer.Name) and workspace.Player[LocalPlayer.Name]:FindFirstChild("Communicate")
     if r then r:FireServer({Key = "Roll", State = Enum.UserInputState.Begin}) end
 end)
 
---// LÓGICA DE HIT PRÓPRIO (FILTRO POR DISTÂNCIA)
+createBtn("🧹 LIMPAR CONSOLE", Color3.fromRGB(150, 0, 0), function()
+    print("\126")
+end)
+
+--// LÓGICA DE HIT PRÓPRIO
 local enemyHealth = {}
-local MAX_HIT_DISTANCE = 15 -- Só detecta dano se o alvo estiver perto de você
+local MAX_HIT_DISTANCE = 18
 
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
@@ -66,16 +71,10 @@ RunService.Heartbeat:Connect(function()
             local h = p.Character.Humanoid
             local targetRoot = p.Character.HumanoidRootPart
             
-            -- Se já temos o registro da vida e ela diminuiu
             if enemyHealth[p.UserId] and h.Health < enemyHealth[p.UserId] then
                 local dist = (root.Position - targetRoot.Position).Magnitude
-                
-                -- FILTRO: Só é o MEU hit se eu estiver colado no cara
                 if dist <= MAX_HIT_DISTANCE then
-                    warn("🎯 MEU HIT DETECTADO! Alvo: " .. p.DisplayName .. " | Dist: " .. math.floor(dist))
-                    
-                    -- AQUI ENTRARÁ O AUTO COMBO
-                    -- task.spawn(function() executeRollCancel() end)
+                    warn("🎯 MEU HIT DETECTADO! Alvo: " .. p.DisplayName)
                 end
             end
             enemyHealth[p.UserId] = h.Health
@@ -83,11 +82,22 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Hook para capturar o nome real do Roll no F9
+--// HOOK CORRIGIDO
 local old; old = hookmetamethod(game, "__namecall", function(self, ...)
     local args = {...}
-    if getgenv().LogRemotes and getnamecallmethod() == "FireServer" and self.Name == "Communicate" then
-        warn("CAPTURA DE COMANDO: " .. game:GetService("HttpService"):JSONEncode(args[1]))
+    local method = getnamecallmethod()
+    
+    if getgenv().LogRemotes and method == "FireServer" and self.Name == "Communicate" then
+        local data = args[1]
+        
+        -- Filtro para não spammar movimentos de CFrame ou valores nulos
+        if type(data) == "table" and data.Key and not tostring(data.Key):find("CF") then
+            -- Correção do JSONEncode (estava escrito errado antes)
+            local success, result = pcall(function() return HttpService:JSONEncode(data) end)
+            if success then
+                warn("CAPTURA: " .. result)
+            end
+        end
     end
     return old(self, ...)
 end)
