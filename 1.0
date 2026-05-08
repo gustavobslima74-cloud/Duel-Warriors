@@ -20,7 +20,7 @@ getgenv().RecordingMode = false
 getgenv().LockUI = false
 getgenv().HighlightEnemy = true
 getgenv().HighlightFriendly = true
-getgenv().ShowStats = true -- INICIA ATIVADO POR PADRÃO AGORA
+getgenv().ShowStats = true
 
 -- Player
 getgenv().EnableSpeed = false
@@ -49,7 +49,7 @@ if CoreGui:FindFirstChild("DuelWarriorsUI") then CoreGui.DuelWarriorsUI:Destroy(
 task.spawn(function()
     StarterGui:SetCore("SendNotification", {
         Title = "Duel Warriors",
-        Text = "Script v1.7 carregado!",
+        Text = "Script v1.7 (Fix v1) carregado!",
         Duration = 5
     })
     
@@ -184,7 +184,7 @@ closeMenuBtn.MouseButton1Click:Connect(toggleMenu)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1, -40, 0, 35); title.Position = UDim2.new(0, 10, 0, 0)
-title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.7"; title.Font = "GothamBlack"
+title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.7.1"; title.Font = "GothamBlack"
 title.TextScaled = true; title.TextXAlignment = Enum.TextXAlignment.Left
 
 --// ABAS SETUP
@@ -434,17 +434,14 @@ createToggle(tabs.Test, "Camera Aimbot (Livre Vertical)", "CamAimbot", function(
     if aimPredToggle then aimPredToggle.Visible = state end
 end)
 aimPredToggle = createToggle(tabs.Test, "  ↳ Aim Prediction", "AimPrediction")
-aimPredToggle.Visible = getgenv().CamAimbot -- Inicia escondido se o Aimbot estiver Off
+aimPredToggle.Visible = getgenv().CamAimbot
 
 --// CONTEÚDO CHANGELOG
-local clText = [[Changelog v1.7
+local clText = [[Changelog v1.7 (Fix v1)
 
 O que mudou? / O que há de novo?
 
-- Organização: Configurações de alcance movidas para a sub-aba "ALCANCES" dentro de Combate.
-- Status do Servidor ativado por padrão e movido para a aba UI.
-- NOVO Camera Aimbot (Teste): Trava sua mira no inimigo horizontalmente, mas deixa você olhar livremente para cima e para baixo!
-- Aim Prediction: Uma sub-opção do Camera Aimbot que calcula o movimento do alvo para te ajudar a acertar ataques mais rápido.]]
+- CORREÇÃO: O Camera Aimbot foi reprogramado. A matemática foi corrigida para garantir que a mira apenas siga o inimigo pros lados (horizontal), mantendo a sua visão para cima e para baixo 100% livre em terceira pessoa!]]
 
 local clLabel = Instance.new("TextLabel", tabs.Changelog)
 clLabel.Size = UDim2.new(1, -5, 0, 0)
@@ -554,23 +551,24 @@ RunService.RenderStepped:Connect(function()
         bg.CFrame = CFrame.lookAt(root.Position, Vector3.new(eRoot.Position.X, root.Position.Y, eRoot.Position.Z))
     elseif root and root:FindFirstChild("DW_AimGyro") then root.DW_AimGyro:Destroy() end
     
-    -- Novo Camera Aimbot (Teste) - Livre no eixo Y
+    -- Novo Camera Aimbot (Teste) - Livre no eixo Y (Pitch Liberado)
     if getgenv().CamAimbot and eRoot and dist <= getgenv().AimbotRange then
         local cam = workspace.CurrentCamera
         local camPos = cam.CFrame.Position
         local targetPos = eRoot.Position
         
-        -- Aim Prediction: Adiciona a velocidade atual do inimigo na direção do alvo
         if getgenv().AimPrediction then
             targetPos = targetPos + (eRoot.AssemblyLinearVelocity * 0.15)
         end
         
-        -- Mantém o ângulo vertical atual da câmera e força o horizontal para o alvo
-        local currentPitch, currentYaw, currentRoll = cam.CFrame:ToEulerAnglesYXZ()
-        local targetCFrame = CFrame.lookAt(camPos, Vector3.new(targetPos.X, camPos.Y, targetPos.Z))
-        local _, targetYaw, _ = targetCFrame:ToEulerAnglesYXZ()
+        -- Pega a inclinação vertical atual da câmera (Pitch)
+        local currentPitch = cam.CFrame:ToEulerAnglesYXZ()
         
-        cam.CFrame = CFrame.new(camPos) * CFrame.Angles(currentPitch, targetYaw, 0)
+        -- Cria uma CFrame que olha pro alvo apenas no eixo horizontal (ignora altura do alvo)
+        local horizontalLook = CFrame.lookAt(camPos, Vector3.new(targetPos.X, camPos.Y, targetPos.Z))
+        
+        -- Aplica a mira horizontal + a inclinação vertical que o jogador está fazendo no mouse
+        cam.CFrame = horizontalLook * CFrame.Angles(currentPitch, 0, 0)
     end
     
     if getgenv().MyHealth and hum then myHealthLbl.Visible = true; myHealthLbl.Text = "MEU HP: "..math.floor(hum.Health).." / "..math.floor(hum.MaxHealth); myHealthLbl.TextColor3 = hum.Health > (hum.MaxHealth*0.6) and Color3.new(0,1,0) or (hum.Health > (hum.MaxHealth*0.3) and Color3.new(1,1,0) or Color3.new(1,0,0)) else myHealthLbl.Visible = false end
