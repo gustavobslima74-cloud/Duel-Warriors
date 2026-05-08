@@ -13,7 +13,10 @@ local LocalPlayer = Players.LocalPlayer
 getgenv().AutoAttack = true
 getgenv().StickMode = false
 getgenv().TeleportOnAttack = false
+
+-- Aimbot Personagem
 getgenv().CharAimLock = false
+getgenv().CharAimPrediction = false
 
 -- Ajustes e Visual
 getgenv().RecordingMode = false
@@ -49,7 +52,7 @@ if CoreGui:FindFirstChild("DuelWarriorsUI") then CoreGui.DuelWarriorsUI:Destroy(
 task.spawn(function()
     StarterGui:SetCore("SendNotification", {
         Title = "Duel Warriors",
-        Text = "Script v1.7 (Fix v1) carregado!",
+        Text = "Script v1.8 carregado!",
         Duration = 5
     })
     
@@ -184,7 +187,7 @@ closeMenuBtn.MouseButton1Click:Connect(toggleMenu)
 
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1, -40, 0, 35); title.Position = UDim2.new(0, 10, 0, 0)
-title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.7.1"; title.Font = "GothamBlack"
+title.BackgroundTransparency = 1; title.Text = "Duel Warriors 1.8"; title.Font = "GothamBlack"
 title.TextScaled = true; title.TextXAlignment = Enum.TextXAlignment.Left
 
 --// ABAS SETUP
@@ -394,7 +397,14 @@ end
 --// CONTEÚDO ABAS
 -- Aba Combate 
 createToggle(tabs.Combat, "Auto Attack", "AutoAttack")
-createToggle(tabs.Combat, "Aimbot (Olhar Inimigo)", "CharAimLock")
+
+local charAimPredToggle
+createToggle(tabs.Combat, "Aimbot (Olhar Inimigo)", "CharAimLock", function(state)
+    if charAimPredToggle then charAimPredToggle.Visible = state end
+end)
+charAimPredToggle = createToggle(tabs.Combat, "  ↳ Aim Prediction", "CharAimPrediction")
+charAimPredToggle.Visible = getgenv().CharAimLock
+
 createToggle(tabs.Combat, "Highlight Aliado", "HighlightFriendly")
 createToggle(tabs.Combat, "Highlight Inimigo", "HighlightEnemy")
 
@@ -428,7 +438,7 @@ createToggle(tabs.Player, "Meu HP na Tela", "MyHealth")
 -- Aba Bypass
 createToggle(tabs.Bypass, "Modo Gravação (Invisível)", "RecordingMode")
 
--- Aba Teste (Novos Sistemas de Mira)
+-- Aba Teste (Câmera)
 local aimPredToggle
 createToggle(tabs.Test, "Camera Aimbot (Livre Vertical)", "CamAimbot", function(state)
     if aimPredToggle then aimPredToggle.Visible = state end
@@ -437,11 +447,12 @@ aimPredToggle = createToggle(tabs.Test, "  ↳ Aim Prediction", "AimPrediction")
 aimPredToggle.Visible = getgenv().CamAimbot
 
 --// CONTEÚDO CHANGELOG
-local clText = [[Changelog v1.7 (Fix v1)
+local clText = [[Changelog v1.8
 
 O que mudou? / O que há de novo?
 
-- CORREÇÃO: O Camera Aimbot foi reprogramado. A matemática foi corrigida para garantir que a mira apenas siga o inimigo pros lados (horizontal), mantendo a sua visão para cima e para baixo 100% livre em terceira pessoa!]]
+- Aim Prediction para Personagem: O Aimbot clássico da aba Combate (que vira o seu corpo) agora também tem a opção de Aim Prediction!
+- A nova predição funciona separada da câmera e garante que seu boneco olhe levemente à frente do inimigo em movimento.]]
 
 local clLabel = Instance.new("TextLabel", tabs.Changelog)
 clLabel.Size = UDim2.new(1, -5, 0, 0)
@@ -545,13 +556,19 @@ RunService.RenderStepped:Connect(function()
     
     if getgenv().StickMode and root and eRoot then root.CFrame = root.CFrame:Lerp(eRoot.CFrame * CFrame.new(0, 0, getgenv().StickDistance), 1 - (getgenv().StickSmoothness/100)) end
     
-    -- Aimbot Antigo (Gira o Personagem inteiro)
+    -- Aimbot Personagem (Agora com Prediction)
     if getgenv().CharAimLock and root and eRoot and dist <= getgenv().AimbotRange then
+        local targetPos = eRoot.Position
+        
+        if getgenv().CharAimPrediction then
+            targetPos = targetPos + (eRoot.AssemblyLinearVelocity * 0.15)
+        end
+        
         local bg = root:FindFirstChild("DW_AimGyro") or Instance.new("BodyGyro", root); bg.Name = "DW_AimGyro"; bg.MaxTorque = Vector3.new(0, math.huge, 0); bg.P = 500000
-        bg.CFrame = CFrame.lookAt(root.Position, Vector3.new(eRoot.Position.X, root.Position.Y, eRoot.Position.Z))
+        bg.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPos.X, root.Position.Y, targetPos.Z))
     elseif root and root:FindFirstChild("DW_AimGyro") then root.DW_AimGyro:Destroy() end
     
-    -- Novo Camera Aimbot (Teste) - Livre no eixo Y (Pitch Liberado)
+    -- Camera Aimbot (Teste) - Livre no eixo Y
     if getgenv().CamAimbot and eRoot and dist <= getgenv().AimbotRange then
         local cam = workspace.CurrentCamera
         local camPos = cam.CFrame.Position
@@ -561,13 +578,8 @@ RunService.RenderStepped:Connect(function()
             targetPos = targetPos + (eRoot.AssemblyLinearVelocity * 0.15)
         end
         
-        -- Pega a inclinação vertical atual da câmera (Pitch)
         local currentPitch = cam.CFrame:ToEulerAnglesYXZ()
-        
-        -- Cria uma CFrame que olha pro alvo apenas no eixo horizontal (ignora altura do alvo)
         local horizontalLook = CFrame.lookAt(camPos, Vector3.new(targetPos.X, camPos.Y, targetPos.Z))
-        
-        -- Aplica a mira horizontal + a inclinação vertical que o jogador está fazendo no mouse
         cam.CFrame = horizontalLook * CFrame.Angles(currentPitch, 0, 0)
     end
     
