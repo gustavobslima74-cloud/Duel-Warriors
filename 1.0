@@ -11,9 +11,12 @@ local LocalPlayer = Players.LocalPlayer
 
 --// VARS GLOBAIS DE COMBATE
 getgenv().AutoAttack = true
+getgenv().AttackDelay = 50 -- NOVO: Delay ajustável em milissegundos (50ms = 0.05s)
 getgenv().PingCompensation = true
 getgenv().StickMode = false
+getgenv().LegitChase = false 
 getgenv().TeleportOnAttack = false
+getgenv().TeamCheck = false 
 
 -- Aimbot Personagem
 getgenv().CharAimLock = false
@@ -27,6 +30,11 @@ getgenv().HighlightFriendly = true
 getgenv().ShowStats = true
 
 -- Player
+getgenv().ComboSpeedBoost = false
+getgenv().ComboBoostAmount = 5 
+getgenv().ComboBoostDistance = 8 
+getgenv().FastAnimations = false 
+getgenv().AnimSpeed = 2 
 getgenv().EnableSpeed = false
 getgenv().StickDistance = 3
 getgenv().StickSmoothness = 0
@@ -34,6 +42,7 @@ getgenv().WalkSpeedValue = 16
 getgenv().InfiniteJump = false
 getgenv().AntiFling = false
 getgenv().HealthESP = false
+getgenv().SkillESP = false 
 getgenv().MyHealth = false
 
 -- Novos Alcances e Aimbot Teste
@@ -46,6 +55,12 @@ local whitelist = {}
 local ActiveFloatingButtons = {}
 local MenuToggles = {}
 
+-- Variáveis do Sistema de Velocidade
+local lastComboBoostTick = 0 
+local isComboBoosting = false
+local preBoostSpeed = 16
+local lastAttackTime = 0 
+
 --// REMOVE ANTIGO
 if CoreGui:FindFirstChild("DuelWarriorsUI") then CoreGui.DuelWarriorsUI:Destroy() end
 
@@ -53,7 +68,7 @@ if CoreGui:FindFirstChild("DuelWarriorsUI") then CoreGui.DuelWarriorsUI:Destroy(
 task.spawn(function()
     StarterGui:SetCore("SendNotification", {
         Title = "Duel Warriors",
-        Text = "Script v1.8 carregado! (Aimbot Inteligente)",
+        Text = "Script v1.8 carregado! (Delay Ajustável)",
         Duration = 5
     })
     
@@ -74,7 +89,13 @@ local function getOptimizedRemote()
     return cachedRemote
 end
 
-local function isWhitelisted(plr) return whitelist[plr.UserId] == true end
+local function isWhitelisted(plr) 
+    if whitelist[plr.UserId] == true then return true end
+    if getgenv().TeamCheck and LocalPlayer.Team ~= nil and plr.Team == LocalPlayer.Team then
+        return true
+    end
+    return false 
+end
 
 local function getClosest()
     local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -93,16 +114,33 @@ local function getClosest()
     return closest, dist
 end
 
---// SISTEMA DE ALVO UNIFICADO (PERFORMANCE MAX)
+--// SISTEMA DE ALVO UNIFICADO
 local currentTarget = nil
 task.spawn(function()
     while true do
-        if getgenv().AutoAttack or getgenv().CharAimLock or getgenv().CamAimbot or getgenv().HighlightEnemy then
+        if getgenv().AutoAttack or getgenv().CharAimLock or getgenv().CamAimbot or getgenv().HighlightEnemy or getgenv().LegitChase then
             currentTarget, _ = getClosest()
         else
             currentTarget = nil
         end
         task.wait(0.05)
+    end
+end)
+
+--// REGISTRO DE CLIQUE MANUAL PARA O SPEED BOOST
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if getgenv().ComboSpeedBoost and currentTarget then
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                local eRoot = currentTarget.Character and currentTarget.Character:FindFirstChild("HumanoidRootPart")
+                
+                if root and eRoot and (root.Position - eRoot.Position).Magnitude <= getgenv().ComboBoostDistance then
+                    lastComboBoostTick = tick()
+                end
+            end
+        end
     end
 end)
 
@@ -216,7 +254,6 @@ floatingMenuBtn.ZIndex = 51
 
 applyClickAnimation(floatingMenuBtn)
 makeDraggable(floatingMenuBtnFrame, floatingMenuBtn)
-
 floatingMenuBtn.MouseButton1Click:Connect(toggleMenu)
 
 local closeMenuBtn = Instance.new("TextButton", main)
@@ -435,8 +472,9 @@ local function spawnFloatingBtn(emoji, varName)
 end
 
 --// CONTEÚDO ABAS
+createToggle(tabs.Combat, "Team Check (Ignorar Aliados)", "TeamCheck")
 createToggle(tabs.Combat, "Auto Attack", "AutoAttack")
-createToggle(tabs.Combat, "Compensação de Ping (Spam Hit)", "PingCompensation")
+createSlider(tabs.Combat, "Delay do Ataque (ms)", 0, 500, 50, "AttackDelay") -- NOVO SLIDER DE DELAY NA ABA COMBATE
 
 local charAimPredToggle
 createToggle(tabs.Combat, "Aimbot (Olhar Inimigo)", "CharAimLock", function(state)
@@ -452,8 +490,9 @@ local alcancesFolder = createDropdownFolder(tabs.Combat, "ALCANCES")
 createStepper(alcancesFolder, "Alcance Auto Attack", "AttackRange", 1)
 createSlider(alcancesFolder, "Alcance Aimbot", 10, 1000, 500, "AimbotRange")
 
-local grudarFolder = createDropdownFolder(tabs.Combat, "GRUDAR")
-createToggle(grudarFolder, "Grudar no Alvo", "StickMode")
+local grudarFolder = createDropdownFolder(tabs.Combat, "GRUDAR / CHASE")
+createToggle(grudarFolder, "Grudar no Alvo (Teleporte)", "StickMode")
+createToggle(grudarFolder, "Legit Chase (Correr Atrás)", "LegitChase")
 createToggle(grudarFolder, "Teleport no Ataque", "TeleportOnAttack")
 createSlider(grudarFolder, "Distância Grudar", 0, 15, 3, "StickDistance")
 createSlider(grudarFolder, "Suavidade", 0, 95, 0, "StickSmoothness")
@@ -465,12 +504,22 @@ createToggle(tabs.UI, "+ Float Auto Attack", "uif1", function(s) if s then spawn
 createToggle(tabs.UI, "+ Float Aimbot", "uif2", function(s) if s then spawnFloatingBtn("👁️", "CharAimLock") end end)
 createToggle(tabs.UI, "+ Float Teleport", "uif3", function(s) if s then spawnFloatingBtn("⚡", "TeleportOnAttack") end end)
 createToggle(tabs.UI, "+ Float Grudar", "uif4", function(s) if s then spawnFloatingBtn("⚔️", "StickMode") end end)
+createToggle(tabs.UI, "+ Float Team Check", "uif5", function(s) if s then spawnFloatingBtn("🛡️", "TeamCheck") end end)
 
-createToggle(tabs.Player, "Ativar Velocidade", "EnableSpeed")
+-- SESSÃO PLAYER
+createToggle(tabs.Player, "Boost de Velocidade no Combo", "ComboSpeedBoost")
+createSlider(tabs.Player, "Força do Boost (+)", 1, 50, 5, "ComboBoostAmount")
+createSlider(tabs.Player, "Distância do Boost", 1, 30, 8, "ComboBoostDistance")
+
+createToggle(tabs.Player, "Acelerar Animação de Combate", "FastAnimations") 
+createSlider(tabs.Player, "Velocidade da Animação (x)", 1, 5, 2, "AnimSpeed") 
+
+createToggle(tabs.Player, "Ativar Velocidade Forçada", "EnableSpeed")
 createSlider(tabs.Player, "Velocidade (Speed)", 16, 200, 16, "WalkSpeedValue")
 createToggle(tabs.Player, "Pulo Infinito", "InfiniteJump")
 createToggle(tabs.Player, "Anti-Ragdoll (Recomendo Desligado)", "AntiFling")
-createToggle(tabs.Player, "Health ESP (5 Perto)", "HealthESP")
+createToggle(tabs.Player, "Health ESP (HP Inimigo)", "HealthESP")
+createToggle(tabs.Player, "ESP de Cooldowns / Skills", "SkillESP") 
 createToggle(tabs.Player, "Meu HP na Tela", "MyHealth")
 
 createToggle(tabs.Bypass, "Modo Gravação (Invisível)", "RecordingMode")
@@ -486,7 +535,7 @@ local clText = [[Changelog v1.8
 
 O que mudou? / O que há de novo?
 
-- Inteligência de Aimbot: O Aimbot agora percebe quando você toma stun/ragdoll e para de forçar a física, acabando com o bug de ficar travado deslizando pelo chão.]]
+- DELAY AJUSTÁVEL: Adicionado um slider na aba Combate que permite você zerar o delay de envio do seu Auto-Attack ou ajustá-lo como preferir. Cuidado para não zerar se o seu ping estiver muito alto, pois o servidor pode te dar kick por rate limit!]]
 
 local clLabel = Instance.new("TextLabel", tabs.Changelog)
 clLabel.Size = UDim2.new(1, -5, 0, 0)
@@ -570,15 +619,44 @@ RunService.RenderStepped:Connect(function()
     for _, data in pairs(OldPanelBtns) do data.Btn.BackgroundTransparency = isRec and 1 or 0; data.Btn.TextTransparency = isRec and 1 or 0; if not isRec then data.Btn.BackgroundColor3 = getgenv()[data.Var] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(30, 30, 30) end end
     for varName, data in pairs(ActiveFloatingButtons) do data.Frame.BackgroundTransparency = isRec and 1 or 0; data.Btn.TextTransparency = isRec and 1 or 0; local x = data.Frame:FindFirstChildOfClass("TextButton"); if x then x.Visible = not isRec end; if not isRec then data.Frame.BackgroundColor3 = getgenv()[varName] and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(20, 20, 20) end end
     
-    local char = LocalPlayer.Character; local hum = char and char:FindFirstChild("Humanoid")
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChild("Humanoid")
     local root = char and char:FindFirstChild("HumanoidRootPart")
     
+    local eRoot = currentTarget and currentTarget.Character and currentTarget.Character:FindFirstChild("HumanoidRootPart")
+    local dist = (root and eRoot) and (root.Position - eRoot.Position).Magnitude or math.huge
+
     if hum then
-        if getgenv().EnableSpeed then hum.WalkSpeed = getgenv().WalkSpeedValue
-        elseif hum.WalkSpeed == getgenv().WalkSpeedValue and getgenv().WalkSpeedValue ~= 16 then hum.WalkSpeed = 16 end
+        if getgenv().EnableSpeed then
+            hum.WalkSpeed = getgenv().WalkSpeedValue
+            isComboBoosting = false
+        else
+            if getgenv().ComboSpeedBoost and (tick() - lastComboBoostTick < 0.25) then
+                if not isComboBoosting then
+                    preBoostSpeed = hum.WalkSpeed
+                    isComboBoosting = true
+                else
+                    if hum.WalkSpeed ~= (preBoostSpeed + getgenv().ComboBoostAmount) and hum.WalkSpeed ~= preBoostSpeed then
+                        preBoostSpeed = hum.WalkSpeed
+                    end
+                end
+                
+                if preBoostSpeed > 0 then
+                    hum.WalkSpeed = preBoostSpeed + getgenv().ComboBoostAmount 
+                else
+                    hum.WalkSpeed = 0
+                end
+            else
+                if isComboBoosting then
+                    if hum.WalkSpeed == (preBoostSpeed + getgenv().ComboBoostAmount) then
+                        hum.WalkSpeed = preBoostSpeed 
+                    end
+                    isComboBoosting = false
+                end
+            end
+        end
     end
 
-    -- INTELIGÊNCIA DE ESTADO: Verifica se você está tomando knockback/stun
     local isStunned = false
     if hum then
         local state = hum:GetState()
@@ -587,15 +665,10 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    local eRoot = currentTarget and currentTarget.Character and currentTarget.Character:FindFirstChild("HumanoidRootPart")
-    local dist = (root and eRoot) and (root.Position - eRoot.Position).Magnitude or math.huge
-    
-    -- O script não vai forçar posição se você estiver atordoado
     if getgenv().StickMode and root and eRoot and not isStunned then 
         root.CFrame = root.CFrame:Lerp(eRoot.CFrame * CFrame.new(0, 0, getgenv().StickDistance), 1 - (getgenv().StickSmoothness/100)) 
     end
     
-    -- AIMBOT INTELIGENTE: Desativa a trava brutal do Gyro enquanto você sofre dano
     if getgenv().CharAimLock and root and eRoot and dist <= getgenv().AimbotRange and not isStunned then
         local targetPos = eRoot.Position
         if getgenv().CharAimPrediction then targetPos = targetPos + (eRoot.AssemblyLinearVelocity * 0.15) end
@@ -607,7 +680,7 @@ RunService.RenderStepped:Connect(function()
         bg.D = 100 
         bg.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPos.X, root.Position.Y, targetPos.Z))
     elseif root and root:FindFirstChild("DW_AimGyro") then 
-        root.DW_AimGyro:Destroy() -- Libera seu corpo para cair naturalmente se tomar stun
+        root.DW_AimGyro:Destroy() 
     end
     
     if getgenv().CamAimbot and eRoot and dist <= getgenv().AimbotRange then
@@ -626,29 +699,66 @@ end)
 
 UserInputService.JumpRequest:Connect(function() if getgenv().InfiniteJump and LocalPlayer.Character:FindFirstChild("Humanoid") then LocalPlayer.Character.Humanoid:ChangeState(3) end end)
 
+-- SESSÃO LEGIT CHASE
+task.spawn(function()
+    while true do
+        if getgenv().LegitChase and currentTarget then
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChild("Humanoid")
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local eRoot = currentTarget.Character and currentTarget.Character:FindFirstChild("HumanoidRootPart")
+            
+            if hum and root and eRoot and hum.Health > 0 then
+                local dist = (root.Position - eRoot.Position).Magnitude
+                if dist > getgenv().AttackRange and dist <= 60 then
+                    hum:MoveTo(eRoot.Position)
+                end
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+-- NOVO SISTEMA: ACELERAÇÃO DE ANIMAÇÕES (Corte de Endlag Visual)
+RunService.Heartbeat:Connect(function()
+    if getgenv().FastAnimations then
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChild("Humanoid")
+        local animator = hum and hum:FindFirstChild("Animator")
+        
+        if animator then
+            for _, track in pairs(animator:GetPlayingAnimationTracks()) do
+                if track.Priority == Enum.AnimationPriority.Action or track.Priority == Enum.AnimationPriority.Action2 or track.Priority == Enum.AnimationPriority.Action3 or track.Priority == Enum.AnimationPriority.Action4 then
+                    track:AdjustSpeed(getgenv().AnimSpeed)
+                end
+            end
+        end
+    end
+end)
+
+-- ATAQUE OTIMIZADO (AGORA COM DELAY AJUSTÁVEL)
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
 
     if getgenv().AutoAttack and currentTarget and root then
-        local eRoot = currentTarget.Character and currentTarget.Character:FindFirstChild("HumanoidRootPart")
+        -- Converte o slider de milissegundos para segundos reais (ex: 50 -> 0.05)
+        local targetDelay = getgenv().AttackDelay / 1000 
         
-        if eRoot then
-            local realTimeDist = (root.Position - eRoot.Position).Magnitude
-            
-            if realTimeDist <= getgenv().AttackRange then
-                local r = getOptimizedRemote()
-                if r then
-                    local spamCount = 1
-                    if getgenv().PingCompensation then
-                        local ping = 50
-                        pcall(function() ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValue() end)
-                        spamCount = math.clamp(math.floor(ping / 30), 1, 8) 
-                    end
-
-                    for i = 1, spamCount do
+        if tick() - lastAttackTime >= targetDelay then
+            local eRoot = currentTarget.Character and currentTarget.Character:FindFirstChild("HumanoidRootPart")
+            if eRoot then
+                local realTimeDist = (root.Position - eRoot.Position).Magnitude
+                if realTimeDist <= getgenv().AttackRange then
+                    local r = getOptimizedRemote()
+                    if r then
                         r:FireServer({Key = "TouchATK", State = Enum.UserInputState.Begin})
                         r:FireServer({Key = "TouchATK", State = Enum.UserInputState.End})
+                        lastAttackTime = tick()
+                        
+                        if getgenv().ComboSpeedBoost and realTimeDist <= getgenv().ComboBoostDistance then
+                            lastComboBoostTick = tick()
+                        end
                     end
                 end
             end
@@ -661,31 +771,127 @@ task.spawn(function()
         local b = LocalPlayer.PlayerGui:FindFirstChild("ATK", true)
         if b and b:IsA("GuiButton") and not b:FindFirstChild("TpHook") then
             Instance.new("BoolValue", b).Name = "TpHook"
-            b.MouseButton1Down:Connect(function() if getgenv().TeleportOnAttack and currentTarget then local t = currentTarget; if t and t.Character then LocalPlayer.Character.HumanoidRootPart.CFrame = t.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, getgenv().StickDistance) end end end)
+            b.MouseButton1Down:Connect(function() 
+                if getgenv().TeleportOnAttack and currentTarget then 
+                    local t = currentTarget; 
+                    if t and t.Character then 
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = t.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, getgenv().StickDistance) 
+                    end 
+                end 
+            end)
         end
         task.wait(1)
     end
 end)
 
+-- SISTEMA MESTRE DE ESP (HEALTH + SKILLS)
 RunService.RenderStepped:Connect(function()
     local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     local plrsDist = {}
+    
     if myRoot then
-        for _, p in pairs(Players:GetPlayers()) do if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character.Humanoid.Health > 0 then table.insert(plrsDist, {plr = p, dist = (myRoot.Position - p.Character.HumanoidRootPart.Position).Magnitude}) end end
+        for _, p in pairs(Players:GetPlayers()) do 
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character.Humanoid.Health > 0 then 
+                table.insert(plrsDist, {plr = p, dist = (myRoot.Position - p.Character.HumanoidRootPart.Position).Magnitude}) 
+            end 
+        end
         table.sort(plrsDist, function(a,b) return a.dist < b.dist end)
     end
-    local top5 = {}; for i=1, math.min(5, #plrsDist) do top5[plrsDist[i].plr] = true end
+    
+    local top5 = {}
+    for i=1, math.min(5, #plrsDist) do top5[plrsDist[i].plr] = true end
+    
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-            local hl = p.Character:FindFirstChild("DW_Highlight") or Instance.new("Highlight", p.Character); hl.Name = "DW_Highlight"; hl.FillTransparency = 0.5
-            if isWhitelisted(p) and getgenv().HighlightFriendly then hl.FillColor = Color3.new(0,1,0); hl.Enabled = true
-            elseif p == currentTarget and getgenv().HighlightEnemy then hl.FillColor = Color3.new(1,0,0); hl.Enabled = true
-            else hl.Enabled = false end
-            local bb = p.Character.HumanoidRootPart:FindFirstChild("DW_HealthESP")
-            if getgenv().HealthESP and top5[p] then
-                if not bb then bb = Instance.new("BillboardGui", p.Character.HumanoidRootPart); bb.Name = "DW_HealthESP"; bb.Size = UDim2.new(0, 80, 0, 30); bb.StudsOffset = Vector3.new(2.5, -1.5, 0); bb.AlwaysOnTop = true; local t = Instance.new("TextLabel", bb); t.Size = UDim2.new(1,0,1,0); t.BackgroundTransparency = 1; t.Font = "GothamBold"; t.TextSize = 11; t.TextStrokeTransparency = 0 end
-                local h = math.floor(p.Character.Humanoid.Health); local m = math.floor(p.Character.Humanoid.MaxHealth); bb.TextLabel.Text = h.." / "..m; bb.TextLabel.TextColor3 = h > (m*0.6) and Color3.new(0,1,0) or (h > (m*0.3) and Color3.new(1,1,0) or Color3.new(1,0,0))
-            elseif bb then bb:Destroy() end
+        if p ~= LocalPlayer and p.Character then
+            if p.Character:FindFirstChild("HumanoidRootPart") then
+                -- Highlight
+                local hl = p.Character:FindFirstChild("DW_Highlight") or Instance.new("Highlight", p.Character)
+                hl.Name = "DW_Highlight"
+                hl.FillTransparency = 0.5
+                if isWhitelisted(p) and getgenv().HighlightFriendly then 
+                    hl.FillColor = Color3.new(0,1,0); hl.Enabled = true
+                elseif p == currentTarget and getgenv().HighlightEnemy then 
+                    hl.FillColor = Color3.new(1,0,0); hl.Enabled = true
+                else 
+                    hl.Enabled = false 
+                end
+                
+                -- Billboard Geral (HP e Skills)
+                local bb = p.Character.HumanoidRootPart:FindFirstChild("DW_HealthESP")
+                
+                if (getgenv().HealthESP or getgenv().SkillESP) and top5[p] then
+                    if not bb then 
+                        bb = Instance.new("BillboardGui", p.Character.HumanoidRootPart)
+                        bb.Name = "DW_HealthESP"
+                        bb.Size = UDim2.new(0, 120, 0, 60)
+                        bb.StudsOffset = Vector3.new(3, -1.5, 0)
+                        bb.AlwaysOnTop = true
+                        
+                        -- Texto do HP
+                        local hpText = Instance.new("TextLabel", bb)
+                        hpText.Name = "HPText"
+                        hpText.Size = UDim2.new(1, 0, 0.4, 0)
+                        hpText.BackgroundTransparency = 1
+                        hpText.Font = Enum.Font.GothamBold
+                        hpText.TextSize = 12
+                        hpText.TextStrokeTransparency = 0
+                        
+                        -- Texto das Skills/Cooldown
+                        local skillText = Instance.new("TextLabel", bb)
+                        skillText.Name = "SkillText"
+                        skillText.Size = UDim2.new(1, 0, 0.6, 0)
+                        skillText.Position = UDim2.new(0, 0, 0.4, 0)
+                        skillText.BackgroundTransparency = 1
+                        skillText.Font = Enum.Font.GothamMedium
+                        skillText.TextSize = 11
+                        skillText.TextStrokeTransparency = 0
+                        skillText.TextColor3 = Color3.fromRGB(255, 200, 0) 
+                        skillText.TextYAlignment = Enum.TextYAlignment.Top
+                    end
+                    
+                    -- Lógica de Vida (HP)
+                    if getgenv().HealthESP then
+                        local h = math.floor(p.Character.Humanoid.Health)
+                        local m = math.floor(p.Character.Humanoid.MaxHealth)
+                        bb.HPText.Text = h.." / "..m
+                        bb.HPText.TextColor3 = h > (m*0.6) and Color3.new(0,1,0) or (h > (m*0.3) and Color3.new(1,1,0) or Color3.new(1,0,0))
+                        bb.HPText.Visible = true
+                    else
+                        bb.HPText.Visible = false
+                    end
+                    
+                    -- Lógica de Cooldowns / Skills
+                    if getgenv().SkillESP then
+                        local sText = ""
+                        
+                        -- 1. Radar de Arma na Mão
+                        local tool = p.Character:FindFirstChildOfClass("Tool")
+                        if tool then
+                            sText = "[" .. tool.Name .. "]"
+                        end
+                        
+                        -- 2. Scanner de Cooldowns Ativos
+                        for _, v in pairs(p.Character:GetChildren()) do
+                            if (v:IsA("NumberValue") or v:IsA("IntValue")) then
+                                local vName = string.lower(v.Name)
+                                if string.find(vName, "cd") or string.find(vName, "cool") or string.find(vName, "time") then
+                                    if v.Value > 0 then
+                                        sText = sText .. "\n⏳ " .. string.sub(v.Name, 1, 6) .. ": " .. string.format("%.1f", v.Value) .. "s"
+                                    end
+                                end
+                            end
+                        end
+                        
+                        bb.SkillText.Text = sText
+                        bb.SkillText.Visible = true
+                    else
+                        bb.SkillText.Visible = false
+                    end
+                    
+                elseif bb then 
+                    bb:Destroy() 
+                end
+            end
         end
     end
 end)
